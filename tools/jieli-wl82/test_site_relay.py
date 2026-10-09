@@ -82,6 +82,70 @@ class FakeSite:
         return {"ok": True}
 
 
+class BoundedSite(FakeSite):
+    """Enforce the Worker's wire and sanitized-result envelope limits."""
+
+    def __init__(self):
+        super().__init__()
+        self.accepted = []
+        self.result_attempts = []
+        self.receipts = {}
+        self.lose_ack_once = False
+        self.result_hook = None
+        self.rejections = []
+
+    def request(self, method, route, body=None):
+        if route == "/relay/result":
+            self.result_attempts.append(json.loads(relay.json_bytes(body)))
+            if self.result_hook is not None:
+                self.result_hook(body)
+            if self.rejections:
+                raise self.rejections.pop(0)
+        if body is not None and len(relay.json_bytes(body)) > 65_536:
+            raise relay.RelayError("http_rejected", 413)
+        if route == "/relay/result":
+            wire_body = json.loads(relay.json_bytes(body))
+            clean = {key: wire_body[key] for key in ("status", "data", "error") if key in wire_body}
+            # JSON.stringify emits Unicode directly and counts UTF-16 code
+            # units. Inputs here are already projected metadata, like the
+            # production relay, so no forbidden fields need sanitizing.
+            encoded = json.dumps(clean, separators=(",", ":"), ensure_ascii=False)
+            if len(encoded.encode("utf-16-le")) // 2 > 60_000:
+                raise relay.RelayError("http_rejected", 413)
+            previous = self.receipts.get(body["id"])
+            if previous is not None and previous != encoded:
+                raise relay.RelayError("http_rejected", 409)
+        response = super().request(method, route, body)
+        if route == "/relay/result":
+            self.receipts[body["id"]] = encoded
+            self.accepted.append(json.loads(relay.json_bytes(body)))
+            if self.lose_ack_once:
+                self.lose_ack_once = False
+                raise relay.RelayError("network_unavailable")
+        return response
+
+
+def metadata_at_budget(sample, max_bytes=relay.MAX_METADATA_BYTES):
+    """Real descriptive metadata exactly at the wire budget, without payloads."""
+    value = {"id": "d" * 32, "status": "unknown", "operation": "plan_app",
+        "error": "bridge_outcome_unknown",
+        "progress": {"phase": "failed", "failed": True, "verified_sectors": 1,
+                     "total_sectors": 2, "message": "Inspect the protected session."},
+        "engine": {"active": None, "blocked_unknown": True, "storage_fault": True,
+                   "updater_handoff": False, "jobs": {"unknown": 1}},
+        "notes": [], "tail": ""}
+    while True:
+        value["notes"].append(sample)
+        if len(relay.json_bytes(value)) > max_bytes:
+            value["notes"].pop()
+            break
+    remaining = max_bytes - len(relay.json_bytes(value))
+    value["tail"] = "z " * (remaining // 2) + ("!" if remaining % 2 else "")
+    assert len(value["tail"]) <= 500
+    assert len(relay.json_bytes(value)) == max_bytes
+    return value
+
+
 class ValidationTests(unittest.TestCase):
     def test_exact_task_schema_rejects_device_or_arbitrary_paths(self):
         bad = [task("reset"), task("read_firmware"), task("status", url="https://other.example"),
@@ -164,6 +228,31 @@ class ValidationTests(unittest.TestCase):
             "session_configured": True, "device_io": False, "blocked": True}})
         self.assertNotIn(b"synthetic-unique-identity", relay.json_bytes(result))
 
+    def test_ascii_and_multibyte_metadata_at_budget_fit_site_envelopes(self):
+        for sample in ("safe text " * 48, "検証済み " * 16):
+            with self.subTest(sample=sample[:10]):
+                value = metadata_at_budget(sample)
+                projected = relay.metadata_only(value)
+                self.assertEqual(projected, value)
+                self.assertEqual(len(relay.json_bytes(projected)), 58_000)
+                result = {"id": "a" * 32, "status": "succeeded", "data": projected}
+                site = BoundedSite()
+                self.assertEqual(site.request("POST", "/relay/result", result), {"saved": True})
+                self.assertLess(len(relay.json_bytes(result)), 65_536)
+
+    def test_one_byte_over_budget_compacts_ascii_and_multibyte_without_losing_outcome(self):
+        for sample in ("safe text " * 48, "検証済み " * 16):
+            with self.subTest(sample=sample[:10]):
+                value = metadata_at_budget(sample)
+                value["tail"] += "!"
+                self.assertEqual(len(relay.json_bytes(value)), 58_001)
+                projected = relay.metadata_only(value)
+                self.assertTrue(projected["metadata_truncated"])
+                for key in ("id", "status", "operation", "error", "progress", "engine"):
+                    self.assertEqual(projected[key], value[key])
+                self.assertNotIn("notes", projected)
+                self.assertLess(len(relay.json_bytes(projected)), relay.MAX_METADATA_BYTES)
+
 
 class RelayTests(unittest.TestCase):
     def setUp(self):
@@ -180,6 +269,17 @@ class RelayTests(unittest.TestCase):
     def restart(self, **fields):
         self.relay.close()
         self.relay = relay.Relay(self.root, self.site, self.bridge, **fields)
+
+    def legacy_result(self, value, max_bytes, sample="safe text " * 48):
+        """Seed a completed receipt produced under the former size budget."""
+        self.relay.handle_task(value)
+        record = self.relay._load(value["id"])
+        old = metadata_at_budget(sample, max_bytes)
+        old["id"] = value["id"]
+        record["result"]["data"] = old
+        self.assertLess(len(relay.json_bytes(record)), relay.MAX_JSON_BYTES)
+        relay.atomic_json(self.relay._path(value["id"]), record)
+        return record["result"]
 
     def test_metadata_routes_are_fixed_and_job_status_is_authoritative(self):
         job_id = uuid.uuid4().hex
@@ -332,6 +432,200 @@ class RelayTests(unittest.TestCase):
         self.assertTrue(first["data"]["metadata_truncated"])
         self.assertTrue(first["data"]["engine"]["blocked_unknown"])
         self.assertEqual(first, self.relay.handle_task(value))
+
+    def test_oversized_first_result_does_not_block_later_task_with_real_site_limits(self):
+        self.site = BoundedSite()
+        self.restart()
+        first = task("status", identifier="0" * 32)
+        second = task("plan_app", catalog_id="nes-test")
+        self.bridge.metadata = {"status": "unknown", "engine": {"blocked_unknown": True},
+                                "notes": ["safe text " * 48 for _ in range(125)]}
+        self.assertGreater(len(relay.json_bytes(self.bridge.metadata)), 60_000)
+        self.assertLess(len(relay.json_bytes(self.bridge.metadata)), relay.MAX_JSON_BYTES)
+        self.site.tasks = [first, second]
+        self.assertEqual(self.relay.run_once(), 2)
+        self.assertEqual([result["id"] for result in self.site.accepted], [first["id"], second["id"]])
+        self.assertTrue(self.site.accepted[0]["data"]["metadata_truncated"])
+        self.assertEqual(self.site.accepted[0]["data"]["status"], "unknown")
+        self.assertTrue(self.site.accepted[0]["data"]["engine"]["blocked_unknown"])
+        self.assertEqual(self.site.accepted[1]["data"]["id"], second["id"])
+        self.assertTrue(self.relay._load(first["id"])["reported"])
+        self.assertTrue(self.relay._load(second["id"])["reported"])
+        self.assertEqual([call[0] for call in self.bridge.calls], ["GET", "POST"])
+        self.assertEqual(self.relay.run_once(), 0)
+        self.assertEqual([call[0] for call in self.bridge.calls], ["GET", "POST"])
+
+    def test_old_oversized_journal_compacts_only_after_413_and_persists_before_retry(self):
+        value = task("plan_app", identifier="0" * 32, catalog_id="nes-test")
+        original = self.legacy_result(value, 62_000)
+        self.site = BoundedSite()
+        def inspect_retry(body):
+            if len(self.site.result_attempts) == 2:
+                stored = self.relay._load(value["id"])
+                self.assertEqual(stored["result"], body)
+                self.assertEqual(stored["phase"], "completed")
+                self.assertFalse(stored["reported"])
+                self.assertTrue(body["data"]["metadata_truncated"])
+        self.site.result_hook = inspect_retry
+        next_task = task("status")
+        self.site.tasks = [next_task]
+        self.restart()
+        self.assertEqual(self.relay.handle_task(value), original)
+        self.assertEqual(self.relay.run_once(), 1)
+        recovered = self.site.accepted[0]
+        self.assertEqual(recovered["id"], value["id"])
+        self.assertTrue(recovered["data"]["metadata_truncated"])
+        for key in ("id", "status", "operation", "error", "progress", "engine"):
+            self.assertEqual(recovered["data"][key], original["data"][key])
+        self.assertEqual(self.site.result_attempts[0], original)
+        self.assertEqual(self.site.result_attempts[1], recovered)
+        self.assertEqual(self.relay._load(value["id"])["result"], recovered)
+        self.assertTrue(self.relay._load(value["id"])["reported"])
+        self.assertEqual([result["id"] for result in self.site.accepted], [value["id"], next_task["id"]])
+        self.assertEqual([call[0] for call in self.bridge.calls], ["POST", "GET"])
+
+    def test_old_accepted_59k_result_with_lost_ack_replays_exactly_after_restart(self):
+        value = task("plan_app", catalog_id="nes-test")
+        original = self.legacy_result(value, 59_000)
+        self.site = BoundedSite()
+        self.site.lose_ack_once = True
+        self.restart()
+        with self.assertRaisesRegex(relay.RelayError, "network_unavailable"):
+            self.relay.run_once()
+        self.assertEqual(self.site.accepted, [original])
+        self.assertFalse(self.relay._load(value["id"])["reported"])
+        self.assertEqual(self.relay._load(value["id"])["result"], original)
+        self.restart()
+        self.assertEqual(self.relay.run_once(), 0)
+        self.assertEqual(self.site.result_attempts, [original, original])
+        self.assertEqual(self.site.accepted, [original, original])
+        self.assertEqual(len(self.site.receipts), 1)
+        self.assertTrue(self.relay._load(value["id"])["reported"])
+        self.assertEqual(self.relay._load(value["id"])["result"], original)
+        self.assertEqual([call[0] for call in self.bridge.calls], ["POST"])
+
+    def test_legacy_64k_metadata_in_larger_journal_migrates_413_without_repost(self):
+        value = task("plan_app", catalog_id="nes-test")
+        original = self.legacy_result(value, relay.LEGACY_METADATA_BYTES)
+        self.assertEqual(len(relay.json_bytes(original["data"])), 65_536)
+        self.assertGreater(self.relay._path(value["id"]).stat().st_size, 65_536)
+        self.site = BoundedSite()
+        def inspect_retry(body):
+            if len(self.site.result_attempts) == 2:
+                stored = self.relay._load(value["id"])
+                self.assertEqual(stored["result"], body)
+                self.assertFalse(stored["reported"])
+        self.site.result_hook = inspect_retry
+        self.restart()
+        self.assertEqual(self.relay.handle_task(value), original)
+        self.assertEqual(self.relay.run_once(), 0)
+        self.assertEqual(self.site.result_attempts[0], original)
+        self.assertGreater(len(relay.json_bytes(self.site.result_attempts[0])), 65_536)
+        self.assertEqual(len(self.site.result_attempts), 2)
+        compact = self.site.accepted[0]
+        self.assertTrue(compact["data"]["metadata_truncated"])
+        for key in ("id", "status", "operation", "error", "progress", "engine"):
+            self.assertEqual(compact["data"][key], original["data"][key])
+        record = self.relay._load(value["id"])
+        self.assertEqual(record["result"], compact)
+        self.assertTrue(record["reported"])
+        self.assertEqual([call[0] for call in self.bridge.calls], ["POST"])
+
+    def test_already_reported_legacy_journal_above_64k_loads_without_reexecution(self):
+        value = task("plan_app", catalog_id="nes-test")
+        original = self.legacy_result(value, relay.LEGACY_METADATA_BYTES)
+        record = self.relay._load(value["id"])
+        record["reported"] = True
+        path = self.relay._path(value["id"])
+        relay.atomic_json(path, record)
+        stored_bytes = path.read_bytes()
+        self.assertGreater(len(stored_bytes), 65_536)
+        self.site = BoundedSite()
+        self.restart()
+        self.assertEqual(self.relay._load(value["id"]), record)
+        self.assertEqual(self.relay.handle_task(value), original)
+        self.assertEqual(self.relay.run_once(), 0)
+        self.assertEqual(self.site.result_attempts, [])
+        self.assertEqual(path.read_bytes(), stored_bytes)
+        self.assertEqual([call[0] for call in self.bridge.calls], ["POST"])
+
+    def test_accepted_multibyte_result_with_large_journal_replays_after_lost_ack(self):
+        value = task("plan_app", catalog_id="nes-test")
+        original = self.legacy_result(value, 65_350, "検証済み " * 16)
+        self.assertLess(len(relay.json_bytes(original)), 65_536)
+        self.assertGreater(self.relay._path(value["id"]).stat().st_size, 65_536)
+        self.site = BoundedSite()
+        self.site.lose_ack_once = True
+        self.restart()
+        with self.assertRaisesRegex(relay.RelayError, "network_unavailable"):
+            self.relay.run_once()
+        self.assertEqual(self.site.accepted, [original])
+        self.assertFalse(self.relay._load(value["id"])["reported"])
+        self.restart()
+        self.assertEqual(self.relay.run_once(), 0)
+        self.assertEqual(self.site.result_attempts, [original, original])
+        self.assertEqual(self.site.accepted, [original, original])
+        self.assertEqual(self.relay._load(value["id"])["result"], original)
+        self.assertTrue(self.relay._load(value["id"])["reported"])
+        self.assertEqual([call[0] for call in self.bridge.calls], ["POST"])
+
+    def test_local_request_size_rejection_persists_compaction_before_retry(self):
+        value = task("plan_app", catalog_id="nes-test")
+        original = self.legacy_result(value, 59_000)
+        self.site = BoundedSite()
+        self.site.rejections = [relay.RelayError("request_too_large")]
+        def inspect_retry(body):
+            if len(self.site.result_attempts) == 2:
+                stored = self.relay._load(value["id"])
+                self.assertEqual(stored["result"], body)
+                self.assertFalse(stored["reported"])
+        self.site.result_hook = inspect_retry
+        self.restart()
+        self.assertEqual(self.relay.run_once(), 0)
+        self.assertEqual(self.site.result_attempts[0], original)
+        self.assertTrue(self.site.accepted[0]["data"]["metadata_truncated"])
+        self.assertTrue(self.relay._load(value["id"])["reported"])
+        self.assertEqual([call[0] for call in self.bridge.calls], ["POST"])
+
+    def test_non_size_report_errors_do_not_compact_retry_or_change_legacy_receipt(self):
+        value = task("plan_app", catalog_id="nes-test")
+        original = self.legacy_result(value, 59_000)
+        self.site = BoundedSite()
+        self.restart()
+        for error in (relay.RelayError("network_unavailable"),
+                      relay.RelayError("http_rejected", 409),
+                      relay.RelayError("http_rejected", 400),
+                      relay.RelayError("invalid_response_type")):
+            with self.subTest(label=error.label, status=error.status):
+                attempts = len(self.site.result_attempts)
+                self.site.rejections = [error]
+                with self.assertRaises(relay.RelayError):
+                    self.relay.report(self.relay.handle_task(value))
+                self.assertEqual(len(self.site.result_attempts), attempts + 1)
+                self.assertEqual(self.site.result_attempts[-1], original)
+                record = self.relay._load(value["id"])
+                self.assertEqual(record["result"], original)
+                self.assertFalse(record["reported"])
+        self.assertEqual(self.site.accepted, [])
+        self.assertEqual([call[0] for call in self.bridge.calls], ["POST"])
+
+    def test_immutable_saved_result_conflict_does_not_change_cached_receipt(self):
+        value = task("plan_app", catalog_id="nes-test")
+        original = self.legacy_result(value, 59_000)
+        self.site = BoundedSite()
+        self.site.request("POST", "/relay/result", original)
+        conflicting = json.loads(relay.json_bytes(original))
+        conflicting["data"]["status"] = "failed"
+        self.restart()
+        with self.assertRaises(relay.RelayError) as caught:
+            self.relay.report(conflicting)
+        self.assertEqual(caught.exception.status, 409)
+        self.assertEqual(self.site.accepted, [original])
+        self.assertEqual(self.site.result_attempts, [original, conflicting])
+        record = self.relay._load(value["id"])
+        self.assertEqual(record["result"], original)
+        self.assertFalse(record["reported"])
+        self.assertEqual([call[0] for call in self.bridge.calls], ["POST"])
 
     def test_site_result_requires_exact_saved_ack_before_marking_reported(self):
         value = task()
@@ -490,6 +784,13 @@ class HttpTransportTests(unittest.TestCase):
         self.assertFalse(self.client.request("GET", "/v1/status")["data"]["device_io"])
         self.assertEqual(self.requests[0][1]["Authorization"], "Bearer " + BRIDGE_TOKEN)
         self.assertNotIn("Oai-Sites-Authorization", self.requests[0][1])
+
+    def test_bridge_catalog_json_above_site_limit_remains_readable(self):
+        data = {"ok": True, "data": {"notes": ["safe text " * 48 for _ in range(160)]}}
+        self.payload = relay.json_bytes(data)
+        self.assertGreater(len(self.payload), 65_536)
+        self.assertLess(len(self.payload), relay.MAX_JSON_BYTES)
+        self.assertEqual(self.client.request("GET", "/v1/catalog"), data)
 
     def test_redirect_is_rejected_without_sending_auth_to_redirect_target(self):
         self.code = 302

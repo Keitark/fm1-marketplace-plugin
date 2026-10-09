@@ -21,12 +21,18 @@ for(const [era,revision] of [['modern','2026-07-28'],['legacy','2025-11-25']]){
       const tools=await client.listTools();
       assert.equal(tools.tools.length,8);
       const panel=tools.tools.find(tool=>tool.name==='open_fm1_library');
+      assert.equal(RESOURCE_URI,'ui://fm1/device-panel-v3.html');
       assert.equal(panel._meta.ui.resourceUri,RESOURCE_URI);
+      assert.ok(tools.tools.filter(tool=>tool._meta?.ui?.resourceUri).every(tool=>tool._meta.ui.resourceUri===RESOURCE_URI));
       assert.deepEqual(panel._meta['openai/ui'].entrypoints,[{type:'global'},{type:'thread'}]);
       assert.deepEqual(tools.tools.find(tool=>tool.name==='confirm_fm1_switch')._meta.ui.visibility,['app']);
       const resource=await client.readResource({uri:RESOURCE_URI});
       assert.equal(resource.contents[0].mimeType,'text/html;profile=mcp-app');
       assert.match(resource.contents[0].text,/FM1PluginHost/);
+      for(const uri of ['ui://fm1/app-library-v1.html','ui://fm1/device-panel-v2.html']){
+        const previous=await client.readResource({uri});
+        assert.deepEqual(previous.contents,[{...resource.contents[0],uri}]);
+      }
       const library=await client.callTool({name:'open_fm1_library',arguments:{}});
       assert.equal(library.structuredContent.profiles.length,5);
       assert.equal(library.structuredContent.relay.connected,false);

@@ -7,16 +7,18 @@ The implementation includes the existing browser store/bridge, a Sites Worker
 with HTTP MCP at `/mcp`, a durable D1 request queue, an MCP App library panel,
 global/thread extension metadata, WebMCP registration, and an outbound Windows
 relay. The relay keeps the existing authenticated bridge and protected writer
-local. Version 2 is privately deployed with pinned server SDK 2.3.1 and
-ext-apps 2.0.3. Local tests/build and live metadata transport passed; rendering
-the new native v2 panel and physical bench acceptance remain separate checks.
+local. Version 3 is privately deployed with pinned server SDK 2.3.1 and
+ext-apps 2.0.3. Local tests/build, live metadata transport, and rendering the
+updated native Codex panel passed. Physical bench acceptance remains separate.
 See [VERIFICATION.md](docs/VERIFICATION.md).
 
 The owner-private [FM1 App Library](https://fm1-app-library.keitark.chatgpt.site)
-is deployed and MCP-ready, and its plugin is installed. The cached native v1
-panel's Refresh and saved-job inspection work through the v2 server. A newly
-opened panel still shows the older heading/tool title, so v2 native rendering
-is not yet accepted. Local inventory reports COM4 and six blocked private
+is deployed and MCP-ready, and its plugin is installed. The native Codex panel
+now renders the updated black/mint interface with **FM1 on COM4**. Native
+Refresh and exact saved-job inspection after the relay restart passed. Its current
+resource is `ui://fm1/device-panel-v3.html`; the v1/v2 resource aliases serve the
+same current UI. A cached tool title may remain older. Local inventory reports
+COM4 and six blocked private
 packages; switching is disabled and no protected session is configured.
 The app and panel icon use an original black/mint
 FM-1 silhouette based on the physical front-panel arrangement.
@@ -60,20 +62,19 @@ python -m unittest discover -s tools/jieli-wl82 -p 'test_*.py'
 node --test tools/jieli-wl82/test_remote_store.cjs
 ```
 
-The earlier 2026-10-09 aggregate check passed **136 Python tests** and
-**10 browser-store JavaScript tests**. After two privacy regressions were added,
-the focused relay suite passed **39 tests**; the Python aggregate was not
-rerun. The current Site suite passed **41 tests**: 25 server, 12 UI, and 4 SDK
-tests. All three PowerShell source scripts parsed successfully.
+The current checks passed **150 Python tests**, **51 focused relay tests**,
+**10 browser-store JavaScript tests**, and **45 Site tests**: 26 server, 15 UI,
+and 4 SDK tests. See [VERIFICATION.md](docs/VERIFICATION.md) for the dated
+results, PowerShell checks, and live validation receipts.
 The Python suite includes relay validation, durable
 same-ID recovery, switch digest/expiry checks, credential filtering, and the
 offline exception fix: failed planning no longer creates an unknown device
 outcome that blocks later device operations.
 
-Site typechecking and the v2 production build passed. Actual SDK Client 2.3.1
+Site typechecking and the v3 production build passed. Actual SDK Client 2.3.1
 negotiated modern `2026-07-28` and legacy `2025-11-25` protocols in memory.
-Remote modern-protocol acceptance remains unverified; a direct deployed
-client probe returned HTTP 401. All six WebMCP tools were
+An earlier direct deployed client probe returned HTTP 401 and did not establish
+remote modern-protocol acceptance. All six WebMCP tools were
 discovered and verified in a supported browser using a local synthetic HTTP
 relay; malformed input was rejected for every tool. See [WEBMCP.md](docs/WEBMCP.md).
 
@@ -108,9 +109,10 @@ protected writer. Transport delivery and bridge job outcome remain distinct:
 a delivered response can contain a failed or unknown job, and interrupted
 submissions are inspected by their saved ID without resubmission.
 
-The installed plugin and metadata relay already have live acceptance. The
-remaining host check is the v2 resource `ui://fm1/device-panel-v2.html` rather
-than a cached v1 panel. There is no exposed supported metadata/resource refresh
-tool; restart or reinstall has not been verified as a fix. Device writes and
+The installed plugin, updated native panel, and metadata relay have live
+acceptance. The panel preserves the original job ID across metadata refresh
+and a lost confirmation reply; inspect that exact ID before any further
+operation. Relay metadata is bounded to 58,000 serialized bytes, with durable
+receipt recovery for proven oversize rejections. Device writes and
 physical screen/audio/control acceptance require
 the established bench prerequisites and an explicitly confirmed operation.

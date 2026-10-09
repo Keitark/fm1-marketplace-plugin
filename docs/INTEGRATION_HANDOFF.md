@@ -21,23 +21,26 @@ created and no device I/O, firmware write, or physical acceptance occurred.
 The browser's six WebMCP tools also passed earlier synthetic execution and
 invalid-input checks.
 
-## SDK deployment and remaining native-panel acceptance
+## Current SDK deployment and native panel
 
-Site version **2** pins official server SDK **2.3.1** and **ext-apps 2.0.3**.
-The current Site suite passed **41 tests** (25 server, 12 UI, 4 SDK), typechecking
+Site version **3** pins official server SDK **2.3.1** and **ext-apps 2.0.3**.
+The current Site suite passed **45 tests** (26 server, 15 UI, 4 SDK), typechecking
 and the production build passed, and deployment
-`appgdep_6ac8f089484881919b4e10b89ef4f608` succeeded with runtime revision 1
+`appgdep_6ac8fc0660648191a2521acd37271e3c` succeeded with runtime revision 1
 and MCP-ready status. Its source SHA is
-`5d32bd0c023d4a3d7ef77fb454164844131a29d0`. Actual SDK Client 2.3.1 negotiated
+`0e76fa6923d74ca96f71312a77d033b4c4935723`. Actual SDK Client 2.3.1 negotiated
 current **2026-07-28** and legacy **2025-11-25** protocols in memory.
 
-After deployment, the cached native v1 panel successfully refreshed status
-and catalog and inspected the original failed MDX job through the v2 server.
-A newly opened native panel still shows **Choose what plays next.** and the
-older tool title. Rendering `ui://fm1/device-panel-v2.html` through the host
-and acceptance of its Apps SDK remain pending cached metadata/resource
-refresh. No supported refresh tool is exposed, and restart/reinstall has not
-been verified as a fix. A direct deployed SDK Client probe using the existing
+The current native Codex panel renders the black/mint **FM1 plugin** interface
+with **FM1 on COM4**. Its current descriptor points to
+`ui://fm1/device-panel-v3.html`; the v1 and v2 resource URLs also serve the
+current UI, preserving older installed registrations. A read-only Codex
+app-server metadata refresh reported the installed app callable and its new
+**FM1 device panel** tool title. Compatibility resource reads resolved the
+previous stale native UI without reinstalling the plugin. The existing
+panel-tab title can still reflect its earlier registration.
+
+A direct deployed SDK Client probe using the existing
 relay service credential returned **HTTP 401**, so modern remote protocol
 negotiation is not accepted by that check. See [VERIFICATION.md](VERIFICATION.md)
 for the exact evidence and remaining boundaries.
@@ -97,12 +100,22 @@ submission. A lost POST response is inspected using its existing ID; it is not
 replaced by a new write request. Delivery state and authoritative bridge job
 status are separate: successful transport can return a failed or unknown job.
 Preserve the saved outcome and verified progress even after a transport failure.
+The native panel retains the original job ID across metadata refresh and
+inspection. It saves the approval/job ID before confirmation; a lost reply
+directs the user to inspect that ID rather than submit another switch.
+
+Relay metadata is bounded to 58,000 encoded bytes to leave room beneath the
+Site's request/result limits. Legacy completed receipts replay unchanged until
+an explicit size rejection proves they were not accepted. Only HTTP 413 or
+local `request_too_large` permits compaction, which is persisted before retry.
+Timeouts and immutable-result conflicts never replace a receipt or repeat a
+bridge submission. The larger existing bridge/journal limits remain intact.
 Unknown device outcomes retain the bridge's persistent block and require local
 inspection. Offline backend exceptions now produce `failed`, so a failed
 `plan_app`, `plan` or `environment` request does not create device uncertainty.
 
 Metadata rollout now uses the supported local bridge on loopback port 9770
-(observed PID 134988) and relay (observed PID 411680), with switching disabled.
+(observed PID 134988) and updated relay (observed PID 422648), with switching disabled.
 These process IDs are dated evidence, not future launch configuration. The
 relay never launches or restarts the bridge or replaces its state.
 Do not substitute a new state directory, clear latches or change a frozen helper
@@ -113,15 +126,14 @@ reactivate that worker or infer that its historical session is usable locally.
 
 The saved MDX plan request/job `d984e14543204d1e93a966099cc708d7` was delivered
 successfully but has authoritative status `failed` with **Start a protected
-session on the laptop first**. Inspection request
-`68060f826e704d2d8075321d4461577d` verified the original saved job. It used no
+session on the laptop first**. Current native inspection request
+`2e5b770a13ed49c69ba90f18bdca17ea` verified the original saved job. It used no
 device I/O. This is current evidence of transport and prerequisite handling,
 not successful planning or device acceptance.
 
 Before device operations, establish an idle verified protected session and
-unit-specific baseline through the bench workflow. Separately accept the
-new v2 resource's host behavior, any explicitly authorized hardware
-operation, and physical screen/audio/control behavior.
+unit-specific baseline through the bench workflow. Separately accept any
+explicitly authorized hardware operation and physical screen/audio/control behavior.
 
 ## Provenance and ownership
 

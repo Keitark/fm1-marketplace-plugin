@@ -12,8 +12,9 @@ const now=()=>Math.floor(Date.now()/1000);
 const result=(data)=>({content:[{type:'text',text:JSON.stringify(data)}],structuredContent:data});
 async function body(request) {
   if(Number(request.headers.get('content-length')||0)>65536)throw new PublicError('Request too large.',413);
-  const raw=await request.text();
-  if(raw.length>65536)throw new PublicError('Request too large.',413);
+  const bytes=await request.arrayBuffer();
+  if(bytes.byteLength>65536)throw new PublicError('Request too large.',413);
+  const raw=new TextDecoder().decode(bytes);
   try{return JSON.parse(raw);}catch{throw new PublicError('Invalid JSON.');}
 }
 const parse=(row)=>row?{id:row.id,operation:row.operation,state:row.state,created:row.created,...(row.result?JSON.parse(row.result):{})}:null;
@@ -149,10 +150,14 @@ async function mcp(request,env){
         }
       });
     }
-    registerAppResource(server,'FM1 device panel',RESOURCE_URI,{},async()=>({contents:[{
-      uri:RESOURCE_URI,mimeType:'text/html;profile=mcp-app',text:UI_HTML,
-      _meta:{ui:{prefersBorder:true,csp:{connectDomains:[],resourceDomains:[]}},'openai/ui':{availableDisplayModes:['inline','fullscreen'],preferredDisplayMode:'fullscreen'}},
-    }]}));
+    // Older installed descriptors can still fetch the current panel at their
+    // original URI. New descriptors exclusively advertise RESOURCE_URI.
+    for(const uri of [RESOURCE_URI,'ui://fm1/app-library-v1.html','ui://fm1/device-panel-v2.html']){
+      registerAppResource(server,'FM1 device panel',uri,{},async()=>({contents:[{
+        uri,mimeType:'text/html;profile=mcp-app',text:UI_HTML,
+        _meta:{ui:{prefersBorder:true,csp:{connectDomains:[],resourceDomains:[]}},'openai/ui':{availableDisplayModes:['inline','fullscreen'],preferredDisplayMode:'fullscreen'}},
+      }]}));
+    }
     return server;
   },{legacy:'stateless',responseMode:'auto',maxRequestBodySize:65536,onerror:error=>console.error('FM1 MCP serving failure:',sanitize(error.message))});
   return handler.fetch(request);

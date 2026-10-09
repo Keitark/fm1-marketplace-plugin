@@ -1,37 +1,35 @@
 # Integration verification
 
 The checks below were recorded on 2026-10-09 using Python 3.11.0 and
-Node.js v22.22.2 on Windows. The original aggregate offline run, later focused
-relay regression run, accepted v2 server deployment, cached native v1 panel,
-and unaccepted native v2 rendering are separate evidence levels.
+Node.js v22.22.2 on Windows. Current Site version 3, the final offline suite,
+and actual native-panel acceptance are recorded below. Earlier import and
+version 2 observations remain historical evidence.
 Offline checks started no live bridge,
 relay, protected helper, USB device, or tunnel.
 
 | Check | Result |
 |---|---|
-| Earlier `python -m unittest discover -s tools/jieli-wl82 -p 'test_*.py'` | 136 tests passed in 35.679 seconds; historical aggregate, not rerun after the two new relay regressions |
-| Latest focused `python -m unittest test_site_relay` from `tools/jieli-wl82/` | 39 tests passed in 4.824 seconds, including physical-identifier filtering |
+| Current `python -m unittest discover -s tools/jieli-wl82 -p 'test_*.py'` | 150 tests passed in 35.329 seconds |
+| Latest focused `python -m unittest test_site_relay` from `tools/jieli-wl82/` | 51 tests passed in 6.578 seconds |
 | `node --test tools/jieli-wl82/test_remote_store.cjs` | 10 tests passed |
 | PowerShell syntax parsing | All 3 scripts passed: `flash-session-client.ps1`, `start-remote-bridge.ps1`, and `start-site-relay.ps1` |
-| Current `node --test site/test/*.test.mjs` | 41 tests passed: 25 server/SQLite, 12 UI, and 4 SDK tests |
-| Current `node node_modules/typescript/bin/tsc --noEmit` from `site/` | Passed for the v2 SDK implementation |
-| Current production build via installed npm CLI and `npm run build` | Passed; v2 Cloudflare Worker output generated |
+| Current `node --test site/test/*.test.mjs` | 45 tests passed: 26 server/SQLite, 15 UI, and 4 SDK tests |
+| Current `node node_modules/typescript/bin/tsc --noEmit` from `site/` | Passed for the current SDK implementation |
+| Current production build via installed npm CLI and `npm run build` | Passed; version 3 Cloudflare Worker output generated |
 | Actual SDK Client 2.3.1 in-memory transport | Modern `2026-07-28` and legacy `2025-11-25` negotiation passed |
 | Earlier synthetic browser UI verification | Passed in Codex in-app browser against a local synthetic HTTP relay; historical disconnected screenshot below |
-| Private Sites deployment | Version 2 succeeded, runtime revision 1; MCP-ready |
-| Installed hosted plugin tools | Earlier library/open, status, catalog, and saved-job calls succeeded; cached v1 panel calls also work through the v2 server |
-| Actual native MCP App iframe | Cached v1 Refresh and saved-job inspection succeeded after v2 deployment; rendering the new v2 resource remains pending |
+| Private Sites deployment | Version 3 succeeded, runtime revision 1; MCP-ready |
+| Installed hosted plugin tools | Library, status, catalog, and saved-job calls succeeded through the installed plugin |
+| Actual native MCP App iframe | Current black/mint panel rendered; Refresh and saved-job inspection succeeded and retained the original job ID |
 | Top-level WebMCP | All 6 tools passed earlier valid/malformed synthetic cases; live Site Refresh succeeded through the metadata relay |
 | Authenticated live bench relay round trip | Passed for inventory, catalog, plan prerequisite failure, and saved-job inspection; switching disabled |
-| Pinned official server SDK 2.3.1 + ext-apps 2.0.3 | Local tests/typecheck/build and v2 deployment passed; native v2 Apps SDK host acceptance remains pending |
+| Pinned official server SDK 2.3.1 + ext-apps 2.0.3 | Tests/typecheck/build/deployment passed; current native Apps SDK render and host tool calls accepted |
 | Direct deployed SDK Client probe with existing relay service credential | HTTP 401; remote modern-protocol negotiation was not accepted by this probe |
 | Hardware write/readback/startup and physical acceptance | Pending; no protected session/helper or physical I/O was used |
 
 Tests use mocked device operations, synthetic data, temporary state, and
-loopback HTTP. The historical 136-test aggregate included 37 outbound relay
-tests plus the bridge, backend, client, and progress tests. The latest focused
-relay run passed 39 tests after adding two identifier privacy regressions; no
-new aggregate total is claimed. They verify strict task/origin
+loopback HTTP. The current 150-test aggregate includes 51 outbound relay
+tests plus the bridge, backend, client, and progress tests. They verify strict task/origin
 validation, distinct credentials, redirect and oversized/nonfinite JSON
 rejection, metadata filtering, per-state process exclusion, durable task/batch
 journaling, duplicate result handling, lost submission/result recovery, and
@@ -61,7 +59,7 @@ changed by this integration.
 The protected writer/bootstrap, private packages, and vendor USB dependencies
 remain outside this repository. Python bytecode generated during verification
 is ignored by Git. Local SDK and deployment acceptance remain distinct from
-native v2 host rendering, remote modern-protocol acceptance, and hardware
+remote modern-protocol acceptance and hardware
 acceptance.
 
 ## Published Site and browser evidence
@@ -117,14 +115,14 @@ The older snapshot worker is stopped and lacks the required remote-read
 guard. The remote laptop is offline. Neither is current evidence of a usable
 local protected session; no frozen helper was replaced or reactivated.
 
-## Version 2 deployment and acceptance boundaries
+## Historical version 2 deployment and acceptance boundaries
 
 Version **2** pins official server SDK **2.3.1** and native-panel **ext-apps
 2.0.3**. Its **41 tests** (25 server, 12 UI, 4 SDK), type check, and production
 build passed. Actual SDK Client 2.3.1 passed in-memory modern **2026-07-28** and
 legacy **2025-11-25** protocol negotiation. The earlier 36-test Site result is
-historical; the 41-test suite is the current SDK implementation's offline
-record. These client tests do not establish remote modern negotiation.
+historical; the 41-test suite was that version's offline record. These client
+tests do not establish remote modern negotiation.
 
 Native deployment `appgdep_6ac8f089484881919b4e10b89ef4f608` succeeded as Site
 version **2**, runtime revision **1**, with MCP-ready status. Source SHA:
@@ -141,13 +139,70 @@ outcome. No device I/O or protected session/helper creation occurred.
 
 ![Cached v1 native panel connected after v2 deployment](images/fm1-native-panel-v1-live.png)
 
-A newly opened native panel still displays **Choose what plays next.** and the
-older tool title. This verifies the cached v1 panel against the v2 backend,
-not rendering or host SDK acceptance of `ui://fm1/device-panel-v2.html`.
-Refreshing cached metadata/resources remains pending. No supported refresh
-tool is exposed, and restart/reinstall has not been verified as a fix.
+During version 2 acceptance, newly opened panels retained **Choose what plays
+next.** and the older tool title. Version 3 compatibility resources resolved
+that stale UI; current rendering and host calls are recorded below.
 
 A direct deployed SDK Client probe using the existing relay service credential
 returned **HTTP 401**. It did not establish modern remote protocol negotiation.
 No raw secrets or private physical identifiers were persisted. Physical
 write/readback/startup, screen, audio, and controls remain unaccepted.
+
+## Current version 3 deployment and native acceptance
+
+Owner-private version **3** deployed successfully as
+`appgdep_6ac8fc0660648191a2521acd37271e3c`, runtime revision **1**, MCP-ready.
+Its pushed source is `0e76fa6923d74ca96f71312a77d033b4c4935723`.
+The current descriptor uses `ui://fm1/device-panel-v3.html`; the earlier
+`ui://fm1/app-library-v1.html` and `ui://fm1/device-panel-v2.html` also return
+the current UI. Modern and legacy SDK tests verify identical content and CSP
+for all three resources.
+
+The actual Codex native MCP App now renders the black/mint **FM1 plugin**
+panel with **FM1 on COM4**. This supersedes the earlier stale-rendering blocker.
+The read-only app-server `app/installed` refresh reported FM1 installed,
+enabled and callable; `app/list` refetch and `app/read` reported the new
+**FM1 device panel** tool title. The existing native tab title still reflects
+the older registration; compatibility resource reads made its UI current.
+No plugin uninstall/reinstall or replacement app was used.
+
+Native **Refresh** succeeded with status request
+`f8fcd7c963f64b2caf8ee67aa89114a5` and catalog request
+`3b61f8abdef742f6a7f9bd196819e821`, retaining the original bridge job ID in
+the recovery field. The relay was then restarted from the updated source,
+preserving its existing state/configuration/credential files, with switching
+disabled. Its new observed PID is **422648**; bridge PID **134988** was not
+restarted or reconfigured. No unfinished relay deliveries existed at the
+restart check.
+
+The updated relay delivered native saved-job inspection
+`2e5b770a13ed49c69ba90f18bdca17ea`, preserving original bridge job
+`d984e14543204d1e93a966099cc708d7` and its authoritative `failed` outcome:
+**Start a protected session on the laptop first**. A further native Refresh
+succeeded with status `7107aa1ea63c491ebdf8f2ce208f9fab` and catalog
+`81b6d583e38c4c1cae5a8053ad488299`. The job ID remained unchanged, the
+panel showed five app cards/six package variants, and no UI error appeared.
+
+![Current native plugin panel with connected FM1 and preserved job ID](images/fm1-native-panel-v3-live.png)
+
+Final offline checks passed **150 Python tests** (including **51 relay**),
+**10 local-store JavaScript tests**, and **45 Site tests** (26 server, 15 UI,
+4 SDK), plus typechecking and the production build. New coverage includes:
+
+- Exact 65,536-byte request acceptance and 65,537-byte rejection for headerless
+  multibyte JSON, without committing the rejected result.
+- Metadata compaction that preserves authoritative outcome/progress and keeps
+  later relay tasks moving under actual Site request/result limits.
+- Legacy journals above 64 KiB, including already-reported records, startup,
+  explicit size rejection and accepted-result ACK loss without another bridge POST.
+- Immutable replay after timeout/conflict; only definite size rejection permits
+  an atomically persisted compact replacement before retry.
+- Saved job ID retention across refresh/inspection and confirmation reply loss,
+  with inspection of the exact committed ID and no duplicate switch submission.
+
+The protected session and verified unit-specific baseline remain external
+bench prerequisites. All six packages remain `ready:false`; switching is
+disabled. These checks performed no device I/O, helper creation, firmware
+write, readback, reset or physical acceptance. Standalone remote modern
+protocol negotiation remains unverified by the earlier service-token probe;
+current native Apps SDK rendering and tool calls are verified separately.

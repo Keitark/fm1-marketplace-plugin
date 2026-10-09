@@ -23,6 +23,34 @@ test('disconnected library remains visible with all five profiles',async()=>{con
 test('disconnected metadata requests are not queued',async()=>{const env=database();await assert.rejects(callTool(env,'alice','get_fm1_status',{}),/offline/);assert.equal(env.DB.sqlite.prepare('SELECT count(*) AS n FROM relay_tasks').get().n,0);});
 test('strict catalog IDs and arguments match bench contract',()=>{for(const id of ['NES','../nes','a'.repeat(65),''])assert.throws(()=>validate('plan_fm1_app',{catalog_id:id}));assert.deepEqual(validate('plan_fm1_app',{catalog_id:'nes-test'}),{catalog_id:'nes-test'});assert.throws(()=>validate('get_fm1_status',{path:'local'}));assert.throws(()=>validate('confirm_fm1_switch',{approval_id:'x'}));});
 test('relay requires separate bearer and valid heartbeat',async()=>{const env=database();assert.equal((await request(env,'/relay/heartbeat',{allow_switch:false})).status,401);assert.equal((await request(env,'/relay/heartbeat',{allow_switch:'yes'},{relay:true})).status,400);assert.equal((await request(env,'/relay/heartbeat',{allow_switch:false},{relay:true})).status,200);});
+test('headerless multibyte relay results enforce the exact 65536-byte request limit',async()=>{
+  const env=database();connect(env);
+  const queued=await callTool(env,'alice','get_fm1_status',{});
+  await request(env,'/relay/poll',{}, {relay:true});
+  const report={id:queued.request_id,status:'succeeded',data:{note:'あ'.repeat(21000)}};
+  const encoder=new TextEncoder();
+  report.data.note+='x'.repeat(65536-encoder.encode(JSON.stringify(report)).byteLength);
+  const accepted=JSON.stringify(report);
+  report.data.note+='x';
+  const oversized=JSON.stringify(report);
+  assert.equal(encoder.encode(accepted).byteLength,65536);
+  assert.equal(encoder.encode(oversized).byteLength,65537);
+  assert.ok(oversized.length<65536);
+  const submit=async raw=>{
+    const input=new Request('https://fm1.test/relay/result',{method:'POST',
+      headers:{'Content-Type':'application/json',authorization:'Bearer '+env.FM1_RELAY_TOKEN},body:raw});
+    assert.equal(input.headers.has('content-length'),false);
+    return handleFm1Request(input,env);
+  };
+  const rejected=await submit(oversized);
+  assert.equal(rejected.status,413);
+  assert.deepEqual(await rejected.json(),{error:'Request too large.'});
+  assert.equal(env.DB.sqlite.prepare('SELECT result FROM relay_tasks WHERE id=?').get(queued.request_id).result,null);
+  const boundary=await submit(accepted);
+  assert.equal(boundary.status,200);
+  assert.deepEqual(await boundary.json(),{saved:true});
+  assert.equal((await callTool(env,'alice','get_fm1_request',{request_id:queued.request_id})).state,'succeeded');
+});
 test('queue claim, metadata result and duplicate acknowledgment roundtrip',async()=>{const env=database();connect(env);const queued=await callTool(env,'alice','get_fm1_status',{});const poll=await request(env,'/relay/poll',{}, {relay:true});assert.equal(poll.body.tasks[0].id,queued.request_id);assert.equal(poll.body.tasks[0].operation,'status');assert.equal((await request(env,'/relay/poll',{}, {relay:true})).body.tasks.length,0);const report={id:queued.request_id,status:'succeeded',data:{engine:{active:false}}};for(let i=0;i<2;i++)assert.deepEqual((await request(env,'/relay/result',report,{relay:true})).body,{saved:true});const saved=await callTool(env,'alice','get_fm1_request',{request_id:queued.request_id});assert.equal(saved.state,'succeeded');assert.equal(saved.data.engine.active,false);});
 test('conflicting relay result never overwrites saved outcome',async()=>{const env=database();connect(env);const queued=await callTool(env,'alice','get_fm1_status',{});await request(env,'/relay/poll',{}, {relay:true});await request(env,'/relay/result',{id:queued.request_id,status:'unknown',error:'uncertain'},{relay:true});assert.equal((await request(env,'/relay/result',{id:queued.request_id,status:'succeeded',data:{}},{relay:true})).status,409);assert.equal((await callTool(env,'alice','get_fm1_request',{request_id:queued.request_id})).state,'unknown');});
 test('result cannot be saved before dispatch',async()=>{const env=database();connect(env);const queued=await callTool(env,'alice','get_fm1_status',{});assert.equal((await request(env,'/relay/result',{id:queued.request_id,status:'succeeded',data:{}},{relay:true})).status,409);});

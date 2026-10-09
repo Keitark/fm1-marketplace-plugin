@@ -23,7 +23,11 @@ from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_ope
 import uuid
 
 MAX_JSON_BYTES = 262_144
-MAX_METADATA_BYTES = 65_536
+LEGACY_METADATA_BYTES = 65_536
+# Leave room for the relay result and durable journal envelopes beneath the
+# Site's 60,000-character clean-result and 64-KiB request limits. json_bytes
+# uses ASCII escapes, so this UTF-8 byte bound also covers multibyte metadata.
+MAX_METADATA_BYTES = 58_000
 ID = re.compile(r"[0-9a-f]{32}\Z")
 SHA = re.compile(r"[0-9a-f]{64}\Z")
 SLUG = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}\Z")
@@ -178,7 +182,8 @@ def normalize_task(value: Any) -> dict[str, Any]:
     return {"id": value["id"], "operation": operation, "arguments": dict(args)}
 
 
-def metadata_only(value: Any, secrets: tuple[str, ...] = (), depth: int = 0) -> Any:
+def metadata_only(value: Any, secrets: tuple[str, ...] = (), depth: int = 0,
+                  *, max_bytes: int = MAX_METADATA_BYTES) -> Any:
     """Discard private payload fields, paths, binary material and credentials."""
     if depth > 16:
         return DROP
@@ -209,7 +214,7 @@ def metadata_only(value: Any, secrets: tuple[str, ...] = (), depth: int = 0) -> 
             safe = metadata_only(item, secrets, depth + 1)
             if safe is not DROP:
                 result[key] = safe
-        if depth == 0 and len(json_bytes(result)) > MAX_METADATA_BYTES:
+        if depth == 0 and len(json_bytes(result)) > max_bytes:
             # Always retain authoritative identity/outcome even when unusual
             # metadata would otherwise prevent committing the durable result.
             compact = {"metadata_truncated": True}
@@ -488,9 +493,13 @@ class Relay:
         if record["phase"] == "completed":
             # Also sanitize cached state so credentials newly configured on a
             # later invocation cannot escape through an older metadata string.
+            # Keep the previous size budget until the Site explicitly rejects
+            # it. An older result may already have been saved before an ACK
+            # was lost; that result must replay identically after an upgrade.
             cached = dict(record["result"])
             if "data" in cached:
-                cached["data"] = metadata_only(cached["data"], self.secrets)
+                cached["data"] = metadata_only(cached["data"], self.secrets,
+                                               max_bytes=LEGACY_METADATA_BYTES)
             return cached
         resumed = record["phase"] == "executing"
         record["phase"] = "executing"
@@ -501,7 +510,28 @@ class Relay:
         return record["result"]
 
     def report(self, result: dict[str, Any]) -> None:
-        acknowledgment = self.site.request("POST", "/relay/result", result)
+        try:
+            acknowledgment = self.site.request("POST", "/relay/result", result)
+        except RelayError as error:
+            # These two failures prove the result was not accepted. Timeout,
+            # malformed ACK and immutable-result conflicts remain ambiguous
+            # and must never cause us to change the cached receipt.
+            if not ((error.label == "http_rejected" and error.status == 413)
+                    or (error.label == "request_too_large" and error.status is None)):
+                raise
+            smaller = dict(result)
+            if "data" in smaller:
+                smaller["data"] = metadata_only(smaller["data"], self.secrets)
+            if smaller == result:
+                raise
+            record = self._load(result["id"])
+            record["result"] = smaller
+            record["reported"] = False
+            # Commit the exact replacement before any retry so a lost second
+            # ACK resumes the same receipt without another bridge submission.
+            atomic_json(self._path(result["id"]), record)
+            result = smaller
+            acknowledgment = self.site.request("POST", "/relay/result", result)
         if type(acknowledgment) is not dict or acknowledgment != {"saved": True}:
             raise RelayError("invalid_result_acknowledgment")
         record = self._load(result["id"])

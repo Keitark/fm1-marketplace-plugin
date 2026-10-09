@@ -15,7 +15,9 @@ need to create another plugin or configure a local MCP server.
 
 The plugin advertises a sidebar entry and a conversation panel. On 2026-10-09,
 the installed plugin's library, status, catalog, and saved-job tools were
-verified, and **Refresh** worked in the actual native MCP App panel. No Chrome
+verified. The updated Site v3 panel renders in Codex with **FM1 on COM4** and
+the black/mint interface. **Refresh** and exact saved-job inspection after
+the relay restart also passed in that native panel. No Chrome
 extension is required for this native plugin experience. The website can be
 opened independently of plugin installation.
 
@@ -31,6 +33,10 @@ transport, not a device write or physical acceptance. A tested MDX **View plan**
 request reached the bridge and failed with **Start a protected session on the
 laptop first**. That is an expected prerequisite failure; no protected helper
 was created and no device I/O occurred.
+
+Inspection after the relay restart returned that same original job and
+prerequisite failure. Refresh retained its job ID; it did not create another
+plan or switch.
 
 If the relay later disconnects, **Bench disconnected** and **Offline** are
 expected. Saved responses can remain visible after a disconnect. With no
@@ -55,6 +61,7 @@ details; preserve an existing listener and its state.
    progress** to inspect that request, or paste the original 32-character job
    ID into **Inspect a saved job** and click **Inspect job**. After a timeout or
    disconnect, resume those IDs instead of submitting another operation.
+   **Refresh** preserves the job ID already entered in the recovery field.
 
 ## Review an app switch
 
@@ -65,8 +72,10 @@ SHA-256, and entry method against the package you intend to use.
 Click **Confirm app switch** yourself only when that review is correct and
 the bench is ready. The approval expires and can be used once. **Cancel** or
 Escape closes the review and clears its approval. Browser tools can open a
-review; they do not expose a confirmation tool. Keep the returned job ID if
-the connection is interrupted.
+review; they do not expose a confirmation tool. The panel saves the original
+job ID before submitting confirmation. If the confirmation reply is lost,
+use **Inspect job** with that ID before reviewing another switch; do not
+submit the operation again.
 
 ## Read progress correctly
 
@@ -79,13 +88,12 @@ successful startup, screen output, sound, or working keys. An unknown device
 outcome needs inspection by the bench owner before another device operation.
 Physical acceptance remains a separate bench check.
 
-Site version 2 is deployed, and Refresh and saved-job inspection still work
-from the cached native panel. A newly opened panel currently keeps the older
-**Choose what plays next.** heading and tool title; the new device panel has
-not yet been accepted in the host. There is no exposed supported panel refresh
-tool, and restart/reinstall has not been verified as a fix. See
-[VERIFICATION.md](VERIFICATION.md) for the distinction between the tested v2
-server and the cached v1 panel.
+Site version 3 is deployed, and the updated native panel is accepted in Codex.
+The server also serves the current UI at the older v1/v2 resource URIs for
+installed-plugin compatibility. An older cached tool title can still appear;
+the verified panel itself shows the current interface. See
+[VERIFICATION.md](VERIFICATION.md) for the dated deployment, native panel,
+metadata, and hardware acceptance evidence.
 
 Further detail: [relay setup](SITE_RELAY.md), [browser tools and verification](WEBMCP.md),
 [integration handoff](INTEGRATION_HANDOFF.md), and [verification evidence](VERIFICATION.md).

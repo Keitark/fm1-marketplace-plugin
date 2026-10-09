@@ -1,10 +1,13 @@
 # Native MCP App panel and browser tools
 
 The installed FM1 plugin and native MCP App panel are the user's primary
-interface. On 2026-10-09, native library/status/catalog/saved-job tools and the
-actual cached v1 panel's Refresh succeeded through the authenticated local relay.
-That panel still refreshes and inspects saved jobs after Site v2 deployment;
-rendering the new v2 resource is not yet accepted in the host.
+interface. On 2026-10-09, native library/status/catalog/saved-job tools and panel
+Refresh succeeded through the authenticated local relay. After Site v3
+deployment, the actual Codex MCP App panel renders the updated black/mint UI
+with **FM1 on COM4**. Older installed descriptors can read that current UI
+through compatibility resource aliases.
+Native Refresh and exact saved-job inspection after the relay restart also
+passed in this updated panel, verifying the deployed MCP Apps SDK host bridge.
 The full website's WebMCP tools are an additional interface; native plugin use
 requires no Chrome extension.
 
@@ -51,19 +54,21 @@ result can still render without that capability. The iframe acknowledges
 `ui/resource-teardown`, aborts its lifecycle, clears approval state, and rejects
 pending requests. Page closure performs the same cleanup.
 
-Site version **2** pins **ext-apps 2.0.3** and official server SDK **2.3.1**.
-The current 41 Site tests, typecheck, production build, and native deployment
+Site version **3** pins **ext-apps 2.0.3** and official server SDK **2.3.1**.
+The current 45 Site tests, typecheck, production build, and private deployment
 passed. Actual SDK Client 2.3.1 negotiated **2026-07-28** and legacy
 **2025-11-25** protocols in memory. The new native UI resource is
-`ui://fm1/device-panel-v2.html`.
+`ui://fm1/device-panel-v3.html`. Tool descriptors advertise that URI; reads of
+`ui://fm1/app-library-v1.html` and `ui://fm1/device-panel-v2.html` return the same
+current HTML with identical metadata and CSP. Both modern and legacy SDK
+integration tests verify these reads.
 
-The cached v1 panel's Refresh and saved-job inspection work through the v2
-server. A newly opened panel still shows **Choose what plays next.** and the
-older tool title. Rendering the new resource and its Apps SDK acceptance in
-the actual host remain pending cached metadata/resource refresh. No supported
-refresh tool is exposed, and restart/reinstall has not been verified as a fix.
-A direct deployed SDK Client probe using the relay service credential returned
-HTTP 401; it did not verify remote modern-protocol negotiation.
+The actual native Codex panel now renders the updated UI, although a cached
+tool title may remain older. The UI preserves the original job ID across
+metadata refresh and a lost confirmation reply. Saved-job inspection always
+targets that exact ID and does not resubmit a plan or switch. An earlier direct
+deployed SDK Client probe using the relay service credential returned HTTP 401;
+that probe did not verify remote modern-protocol negotiation.
 
 ## Verification recorded on 2026-10-09
 
@@ -77,6 +82,14 @@ configured. The tested MDX plan was delivered but its bridge job failed with
 no device I/O occurred. These live results verify metadata transport and
 prerequisite handling, not a successful plan or hardware acceptance.
 
+After the v3 deployment, native Refresh succeeded and preserved the original
+job ID in the recovery field. After restarting the relay with its existing
+state, native **Inspect job** returned the same original MDX job with its
+authoritative protected-session prerequisite failure. These checks establish
+current native rendering and host-proxied calls without resubmitting the job.
+Exact request IDs and deployment receipts are in
+[VERIFICATION.md](VERIFICATION.md).
+
 Earlier synthetic browser validation covered the complete six-tool contract:
 
 In a supported in-app browser, all six tools were discovered and called with
@@ -89,12 +102,14 @@ browser's Confirm control was not clicked. A local SQLite read after stopping
 the fixture confirmed zero queued `switch_app` tasks; no device writes were
 performed.
 
-The current **12 formal UI tests** in `site/test/ui.test.mjs` passed. They cover initial
+The current **15 formal UI tests** in `site/test/ui.test.mjs` passed. They cover initial
 render without duplicate requests, initial render without `serverTools`,
 fallback, teardown, registry abort, nonce-free review, untrusted confirmation
 rejection, Cancel/Escape, one-use trusted confirmation, awaited job inspection,
 malformed input rejection, and the native device-controls view with a detected
-port and no duplicate refresh. The trusted-click test is a VM fixture, not a
+port and no duplicate refresh. Additional recovery checks preserve the job ID
+through refresh and a lost confirmation reply, and select the exact job ID
+for WebMCP inspection without resubmission. The trusted-click test is a VM fixture, not a
 physical browser or hardware operation.
 
 ## Repeat the local fixture
@@ -132,6 +147,7 @@ installed dependencies. Do not use a deployed Site or real bridge credentials.
 
 The fixture accepts only the literal loopback origin on port 3000, imports no
 bridge or device backend, and returns synthetic metadata. These results do
-not establish actual native v2 resource rendering, remote modern negotiation, or hardware
+not establish actual native resource rendering, remote modern negotiation, or hardware
 write/readback/startup, sound, screen, keys, or physical acceptance. Live native
-plugin and metadata relay evidence is recorded separately above.
+plugin rendering and metadata relay evidence are recorded separately above
+and in [VERIFICATION.md](VERIFICATION.md).

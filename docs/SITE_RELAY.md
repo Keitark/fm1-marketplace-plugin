@@ -4,31 +4,36 @@
 polls the private hosted Site using outbound HTTPS and forwards a small set of
 operations to the existing authenticated bridge. It imports no USB/serial
 backend and does not start, restart, configure, or replace the bridge or its
-protected writer session. The installed plugin, cached native v1 panel,
-website, and live relay have passed metadata round trips. After Site version 2
-deployment, cached-panel Refresh and saved-job inspection still worked through
-the new server. Rendering the new native v2 resource remains unverified.
+protected writer session. The installed plugin, native panel, website, and live
+relay have passed metadata round trips. Site version 3 is privately deployed
+and MCP-ready; the actual Codex panel renders the updated black/mint UI with
+**FM1 on COM4**. The v1/v2 resource aliases return the current v3 UI for older
+installed descriptors.
 Protected-session preparation,
 device operations, and physical acceptance remain separate bench work.
 
 ## Verified metadata setup on 2026-10-09
 
-The supported local bridge was launched on loopback port 9770 without a
-`SessionRoot` or official updater; the observed process ID was 134988. The
-outbound relay's observed process ID was 411680, with switching disabled.
-These are dated observations, not permanent process identities. Inspect the
+The supported local bridge remains on loopback port 9770 without a
+`SessionRoot` or official updater; its recorded PID is **134988**. The relay was
+restarted with its existing state and switching disabled; its recorded PID is
+**422648**. These are 2026-10-09 observations, not permanent process identities.
+See [VERIFICATION.md](VERIFICATION.md) for the dated receipts. Inspect the
 current listener/process before any future launch and do not start duplicates.
 
 Inventory reported COM4 and CDC/audio interfaces. Six validated private
 packages were listed, all with `ready:false`. The missing protected session
 and verified baseline intentionally keep device switching unavailable.
 Installed plugin status/catalog/job calls, native-panel Refresh, and live
-Site WebMCP Refresh worked through this relay.
+Site WebMCP Refresh worked through this relay. In the updated v3 native panel,
+Refresh succeeded and retained the original job ID. Exact saved-job inspection
+also succeeded after the relay restart.
 
 The MDX plan request/bridge job `d984e14543204d1e93a966099cc708d7` had delivery
 `succeeded` and authoritative bridge status `failed`, with the prerequisite
-message **Start a protected session on the laptop first**. Saved-job inspection
-used delivery request `68060f826e704d2d8075321d4461577d`. No device I/O or
+message **Start a protected session on the laptop first**. Native saved-job
+inspection after the relay restart used delivery request
+`2e5b770a13ed49c69ba90f18bdca17ea` and returned that same original job. No device I/O or
 protected-helper creation occurred. The older snapshot worker is stopped and
 lacks the required remote-read guard; it must not be reactivated as a shortcut.
 The remote laptop is offline, so its earlier protected setup is not current
@@ -141,6 +146,13 @@ are filtered recursively, including case and snake-case variants. Port,
 VID/PID, description/model, and safe readiness flags remain available.
 Detailed diagnostics and all firmware/ROM/music bytes stay on the laptop.
 
+New projected metadata is limited to **58,000 serialized bytes**, leaving room
+for the Site result and journal envelopes. ASCII-escaped JSON serialization
+makes the limit apply to multibyte text too. Oversize metadata is compacted
+with `metadata_truncated:true`, retaining bounded identity, outcome, progress,
+and safe engine flags. The Site independently enforces a 65,536-byte request
+limit before decoding JSON, even when `Content-Length` is absent.
+
 ## Durability and uncertainty
 
 An OS-held lock allows one process per relay state directory. Every validated
@@ -150,6 +162,13 @@ only after its sanitized result is committed atomically. Repeated IDs replay
 the saved result; a repeated ID with different arguments is rejected. A lost
 Site result acknowledgment is retried with the identical saved result. The
 result is marked reported only for an exact `{"saved":true}` acknowledgment.
+
+Completed legacy receipts retain their previous size budget so an already
+accepted result can replay identically after an upgrade. Only a definite Site
+HTTP **413** or local `request_too_large` rejection permits compaction of an
+oversize saved receipt. The replacement is journaled before retrying the Site
+result report. A timeout, malformed acknowledgment, or immutable-result
+conflict preserves the receipt; none authorizes another bridge job POST.
 
 If a bridge job submission loses its response, the relay only queries
 `GET /v1/jobs/<saved-task-id>`. It does not resubmit, create a new ID, clear an
@@ -178,9 +197,10 @@ duplicate task and process exclusion, interrupted submission/restart recovery,
 batch persistence, and lost Site acknowledgments. They neither connect to the
 actual Site nor start any device operation.
 
-The latest focused relay run passed **39 tests**, including recursive physical
-identifier filtering in results and the journal. The earlier aggregate Python
-run contained 136 tests and 37 relay tests; that aggregate was not rerun after
-the two new identifier regressions. See [VERIFICATION.md](VERIFICATION.md) for
-current live metadata evidence, the accepted v2 SDK tests/build/deployment,
-and the remaining native v2 panel/remote modern-protocol checks.
+The current aggregate Python run passed **150 tests**; the focused relay run
+passed **51 tests**. See [VERIFICATION.md](VERIFICATION.md) for the dated
+counts, live metadata evidence, and v3 deployment/native panel acceptance. The
+suite includes recursive physical-identifier filtering, ASCII/multibyte
+metadata size boundaries, legacy receipt replay, and recovery only after a
+proven oversize rejection. Remote modern-protocol acceptance and physical
+device acceptance are recorded separately from local SDK and metadata checks.
