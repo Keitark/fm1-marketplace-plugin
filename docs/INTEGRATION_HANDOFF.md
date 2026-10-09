@@ -1,47 +1,151 @@
 # FM1 Codex integration handoff
 
-## Goal and current state
+## Current implementation and acceptance
 
-The user wants the local FM1 store available in Codex, using OpenAI plugin extensions and potentially a Sites-hosted MCP App/server plus WebMCP. They requested publishing this source repository and collaboration with the running **Set up remote debug kit** chat on this PC.
+This repository now includes the FM1 Site adapter, MCP App panel, top-level
+WebMCP tools and outbound Windows relay alongside the original store/bridge
+source. The initial publication at `b024784` established the source foundation;
+the integration extends that work rather than replacing the protected writer.
+The owner-private [FM1 App Library](https://fm1-app-library.keitark.chatgpt.site)
+is deployed and MCP-ready. The plugin is installed: library, status, catalog,
+and saved-job tools have succeeded. Refresh worked in the actual native MCP
+App iframe, and live Site WebMCP Refresh worked through the authenticated
+local relay. The native plugin/panel is the user's selected primary interface;
+it does not require a Chrome extension.
 
-This repository is the current store/bridge foundation. It has no MCP transport or extension registration yet. The first session researched feasibility and prepared this source snapshot; a follow-up session should implement and verify the integration.
+The local bridge currently has no configured protected session or official
+updater. Inventory reported COM4 and CDC/audio interfaces, and six validated
+private packages all remained `ready:false`. An MDX plan reached the bridge
+but correctly failed on the protected-session prerequisite. No helper was
+created and no device I/O, firmware write, or physical acceptance occurred.
+The browser's six WebMCP tools also passed earlier synthetic execution and
+invalid-input checks.
 
-## Existing operations to reuse
+## Current SDK deployment and native panel
 
-| Capability | Existing API | Integration behavior |
+Site version **3** pins official server SDK **2.3.1** and **ext-apps 2.0.3**.
+The current Site suite passed **45 tests** (26 server, 15 UI, 4 SDK), typechecking
+and the production build passed, and deployment
+`appgdep_6ac8fc0660648191a2521acd37271e3c` succeeded with runtime revision 1
+and MCP-ready status. Its source SHA is
+`0e76fa6923d74ca96f71312a77d033b4c4935723`. Actual SDK Client 2.3.1 negotiated
+current **2026-07-28** and legacy **2025-11-25** protocols in memory.
+
+The current native Codex panel renders the black/mint **FM1 plugin** interface
+with **FM1 on COM4**. Its current descriptor points to
+`ui://fm1/device-panel-v3.html`; the v1 and v2 resource URLs also serve the
+current UI, preserving older installed registrations. A read-only Codex
+app-server metadata refresh reported the installed app callable and its new
+**FM1 device panel** tool title. Compatibility resource reads resolved the
+previous stale native UI without reinstalling the plugin. The existing
+panel-tab title can still reflect its earlier registration.
+
+A direct deployed SDK Client probe using the existing
+relay service credential returned **HTTP 401**, so modern remote protocol
+negotiation is not accepted by that check. See [VERIFICATION.md](VERIFICATION.md)
+for the exact evidence and remaining boundaries.
+
+## Architecture
+
+`ChatGPT/Codex -> private Site Worker -> durable D1 queue <- outbound Windows relay -> existing loopback FM1 bridge -> established protected session -> FM1`
+
+- The Site Worker handles HTTP MCP at `/mcp`, including tool discovery and MCP
+  UI resources. The app library advertises global and thread entrypoints. Its
+  panel uses the MCP App host bridge; the full website separately feature-detects
+  `document.modelContext.registerTool` and offers WebMCP in the top-level page.
+  The ordinary library controls remain available when WebMCP is unavailable.
+- D1 holds user-owned requests, delivery outcomes and expiring approvals. The
+  relay polls outbound; the hosted server does not connect directly to laptop
+  loopback or assume private-tailnet reachability.
+- The relay authenticates to the private Site with a Sites service token
+  (`OAI-Sites-Authorization`) and a separate scoped relay bearer token. The
+  existing bridge bearer credential stays on the Windows side. These are
+  distinct credentials; none belongs in catalog data, tool results or browser
+  storage.
+- The local store remains same-origin with its HTTP API and retains
+  `frame-ancestors 'none'`. The native panel serves its own UI resource instead
+  of embedding that loopback page.
+
+## Operations and approval
+
+| Capability | Local API reused | Boundary |
 |---|---|---|
-| Device inventory and writer state | `GET /v1/status` | Read current readiness; preserve blocked and unknown outcomes. |
-| App library | `GET /v1/catalog` | Return variant metadata and readiness, without firmware image bytes. |
-| Offline app plan | `POST /v1/jobs`, `operation: plan_app` | Requires a catalog ID and an existing verified baseline; returns a durable job ID. |
-| Job status/progress | `GET /v1/jobs/<id>` | Resume by saved ID; do not resubmit after a network timeout. |
-| App switching | `POST /v1/jobs`, `operation: switch_app` | Preserve catalog validation, explicit entry method, confirmation, and protected writer checks. |
+| Inventory and writer state | `GET /v1/status` | Inventory/persisted state; preserve blocked and unknown outcomes. |
+| App library | `GET /v1/catalog` | Variant metadata, digest and baseline readiness; no firmware bytes. |
+| Offline plan | `POST /v1/jobs`, `plan_app` | Existing catalog ID and verified baseline; no device I/O. |
+| Saved job inspection | `GET /v1/jobs/<id>` | Resume the original ID without resubmission. |
+| App switching | `POST /v1/jobs`, `switch_app` | Explicit entry method, reviewed approval and protected writer checks. |
 
-The store's `api()`, `refresh()`, `preview()`, `choose()`, `submit()`, and `poll()` functions already implement these flows. Job submission uses a unique ID. The backend delegates device work to `flash-session-client.ps1` and the selected existing protected session. The source snapshot also includes progress reporting and explicit app-variant labels from the active progress kit.
+Relay switching is disabled by default. Enabling its local capability is a
+deliberate bench configuration step, not permission for a particular write.
+The Site stages a review without submitting a write. Human confirmation consumes
+an expiring, one-use approval bound to the signed-in user, catalog ID, package
+digest and entry method; queue insertion and approval consumption are atomic.
+The approval ID becomes the durable bridge job ID. The confirmation tool is
+app-visible rather than a model-visible shortcut. The local bridge still has
+no per-write consent field; the adapter owns this approval boundary.
 
-`/v1/status` is inventory/persisted-state access. `serial_status` and `read_firmware` are separate device operations; do not label them as passive reads. Firmware read setup can affect loader/protection state.
+Only metadata crosses the relay. Keep private catalog bundle JSON, firmware,
+ROM/music inputs, baseline images, session descriptors, receipts, device paths
+and tokens local. Low-level recovery/helper management remains a bench operation.
+Serial numbers, PnP unit identifiers, and related physical identity fields are
+also filtered before Site results and local relay result journals are saved.
+`serial_status` and `read_firmware` are device operations, not passive metadata
+reads; firmware read setup can alter loader/protection state.
 
-## Extension and transport findings
+## Durable outcomes and deployment boundaries
 
-- [OpenAI plugin extensions](https://developers.openai.com/plugins/build/extensions) provide sidebar and conversation entrypoints through MCP App metadata. Test the chosen surface in the user's installed Codex/desktop app; the documentation describes ChatGPT surfaces.
-- [WebMCP site tools](https://learn.chatgpt.com/docs/webmcp) use `document.modelContext.registerTool` in a top-level browser page. Feature-detect this API and preserve the human interface when it is unavailable.
-- WebMCP tools inside iframes are not discovered. An MCP App panel therefore needs server MCP tools and its app-to-host bridge; WebMCP can be offered separately by the full website.
-- The existing store sets `frame-ancestors 'none'`, and the HTTP API has no cross-origin access. Do not simply iframe the loopback page or weaken authentication to make a hosted page connect.
-- A hosted Sites backend cannot reach loopback or a private tailnet endpoint by default. Keep the Windows device bridge local; choose and verify an authenticated relay/tunnel before claiming hosted tool access.
-- [Sites MCP instructions](https://learn.chatgpt.com/docs/sites) should be checked with the installed Sites skills during implementation. Sites provisions its own plugin connection; preserve user-specific authorization and its hosting authentication.
+Requests are saved before delivery and journaled locally before bridge
+submission. A lost POST response is inspected using its existing ID; it is not
+replaced by a new write request. Delivery state and authoritative bridge job
+status are separate: successful transport can return a failed or unknown job.
+Preserve the saved outcome and verified progress even after a transport failure.
+The native panel retains the original job ID across metadata refresh and
+inspection. It saves the approval/job ID before confirmation; a lost reply
+directs the user to inspect that ID rather than submit another switch.
 
-For a native panel, the intended path is `Codex MCP App -> hosted MCP tools -> trusted local transport -> FM1 bridge -> protected session -> USB device`. For local WebMCP, the page can use its current same-origin authenticated API directly.
+Relay metadata is bounded to 58,000 encoded bytes to leave room beneath the
+Site's request/result limits. Legacy completed receipts replay unchanged until
+an explicit size rejection proves they were not accepted. Only HTTP 413 or
+local `request_too_large` permits compaction, which is persisted before retry.
+Timeouts and immutable-result conflicts never replace a receipt or repeat a
+bridge submission. The larger existing bridge/journal limits remain intact.
+Unknown device outcomes retain the bridge's persistent block and require local
+inspection. Offline backend exceptions now produce `failed`, so a failed
+`plan_app`, `plan` or `environment` request does not create device uncertainty.
 
-## Suggested next steps
+Metadata rollout now uses the supported local bridge on loopback port 9770
+(observed PID 134988) and updated relay (observed PID 422648), with switching disabled.
+These process IDs are dated evidence, not future launch configuration. The
+relay never launches or restarts the bridge or replaces its state.
+Do not substitute a new state directory, clear latches or change a frozen helper
+to bring the Site online. Inspect live launcher/session selection before any
+operational change. The older protected snapshot worker is stopped and lacks
+the required remote-read guard, and the remote laptop is offline. Do not
+reactivate that worker or infer that its historical session is usable locally.
 
-1. Confirm the first user-facing experience: a native panel, tools in the existing local store, or both. The previous experience picker was unanswered; neither option is an established preference.
-2. Read the installed OpenAI Docs and Sites MCP skills and current official APIs before implementation. No OpenAI inference API is needed merely to expose existing FM1 tools.
-3. Implement catalog, inventory, offline planning, and job inspection first, using narrow schemas and metadata-only results.
-4. Verify disconnected, blocked, missing-package, invalid-ID, and timeout/resume behavior with the existing offline tests and meaningful integration checks.
-5. Add app switching through the reviewed confirmation flow. A tool that requests confirmation must not submit a write while claiming only to display a dialog.
-6. If using Sites, verify the transport and permissions, then package/deploy privately and verify a read-only tool through the provisioned plugin.
+The saved MDX plan request/job `d984e14543204d1e93a966099cc708d7` was delivered
+successfully but has authoritative status `failed` with **Start a protected
+session on the laptop first**. Current native inspection request
+`2e5b770a13ed49c69ba90f18bdca17ea` verified the original saved job. It used no
+device I/O. This is current evidence of transport and prerequisite handling,
+not successful planning or device acceptance.
 
-## Source and coordination boundaries
+Before device operations, establish an idle verified protected session and
+unit-specific baseline through the bench workflow. Separately accept any
+explicitly authorized hardware operation and physical screen/audio/control behavior.
 
-The live launcher configuration selected `progress-kit/fm1-remote` when this snapshot was prepared, and the setup chat confirmed that the convenience launcher also selects that kit. Inspect the live launch configuration again before operational changes. This publication does not modify or restart the running bridge.
+## Provenance and ownership
 
-The remote-debug setup chat owns live bench setup and its private assets. Coordinate changes with it. Keep private catalog JSON (which contains firmware image bytes), bootstrap images, ROM/music inputs, device receipts, tokens, actual session descriptors, and runtime installers out of this public repository. Use synthetic fixtures for tests. The protected session and vendor USB dependencies remain external prerequisites.
+The initial snapshot imported the active `progress-kit/fm1-remote` store/bridge
+source. `source-snapshot.json` remains its historical import record, not a hash
+manifest for the subsequently modified implementation. Existing Git history
+preserves that source closure. [VERIFICATION.md](VERIFICATION.md) records current
+checks; [REMOTE_DEBUG_REFERENCE.md](REMOTE_DEBUG_REFERENCE.md) describes the bench
+contract.
+
+The **Set up remote debug kit** chat retains ownership of live bench setup and
+private assets. Coordinate operational changes with that owner. The protected
+helper, verified unit-specific baseline, vendor USB dependencies and physical
+screen/audio/control acceptance remain external prerequisites. This integration
+does not install or replace those assets.

@@ -374,7 +374,8 @@ class JobManager:
             _json_bytes(result)
             status = "succeeded" if result["ok"] else "failed"
         except BaseException as exc:
-            status = "unknown"
+            # Offline failures cannot make the device outcome uncertain.
+            status = "failed" if request["operation"] in OFFLINE_OPERATIONS else "unknown"
             # Never include exception text: backend failures may contain private
             # request data or paths. The local backend owns detailed diagnostics.
             error = "backend raised " + type(exc).__name__ + "; no automatic retry"
