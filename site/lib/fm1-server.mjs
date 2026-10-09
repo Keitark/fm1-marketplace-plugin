@@ -1,6 +1,10 @@
 import { ID, PublicError, PROFILES, RESOURCE_URI, TOOLS, sanitize, validate } from './fm1-contract.mjs';
 import { UI_HTML } from './fm1-ui.mjs';
 import { ICONS } from './fm1-icon.mjs';
+import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
+import { CfWorkerJsonSchemaValidator } from '@modelcontextprotocol/server/validators/cf-worker';
+import { registerAppResource, registerAppTool } from '@modelcontextprotocol/ext-apps/server';
+import { z } from 'zod';
 
 const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 const ident=()=>crypto.randomUUID().replaceAll('-','');
@@ -115,29 +119,43 @@ async function relayRequest(request,env,path){
   throw new PublicError('Unknown relay route.',404);
 }
 async function mcp(request,env){
-  if(request.method!=='POST')return json({error:'Use stateless POST /mcp.'},405);
   safeOrigin(request,env);
-  const rpc=await body(request);
-  if(!rpc||rpc.jsonrpc!=='2.0'||typeof rpc.method!=='string'||Array.isArray(rpc))return json({jsonrpc:'2.0',id:null,error:{code:-32600,message:'Invalid request.'}},400);
-  if(rpc.id===undefined){if(rpc.method.startsWith('notifications/'))return new Response(null,{status:202});return json({error:'Request ID required.'},400);}
-  try{
-    let value;
-    if(rpc.method==='initialize')value={protocolVersion:'2025-11-25',capabilities:{tools:{},resources:{}},serverInfo:{name:'FM1 App Library',version:'1.0.0',icons:ICONS},instructions:'Inspect saved request IDs after a disconnect. Offline planning does not authorize app switching. Actual switching requires explicit human confirmation and enabled bench capability.'};
-    else if(rpc.method==='ping')value={};
-    else if(rpc.method==='tools/list')value={tools:TOOLS};
-    else if(rpc.method==='resources/list')value={resources:[{uri:RESOURCE_URI,name:'FM1 App Library',mimeType:'text/html;profile=mcp-app'}]};
-    else if(rpc.method==='resources/read'){
-      if(rpc.params?.uri!==RESOURCE_URI)throw new PublicError('Unknown UI resource.',404);
-      value={contents:[{uri:RESOURCE_URI,mimeType:'text/html;profile=mcp-app',text:UI_HTML,_meta:{ui:{prefersBorder:true,csp:{connectDomains:[],resourceDomains:[]}},'openai/ui':{availableDisplayModes:['inline','fullscreen'],preferredDisplayMode:'fullscreen'}}}]};
-    }else if(rpc.method==='tools/call'){
-      const owner=user(request);
-      try{
-        const data=await callTool(env,owner,rpc.params?.name,rpc.params?.arguments||{});
-        if(data._approval){const {_approval,...publicData}=data;value={...result(publicData),_meta:{approval_id:_approval}};}else value=result(data);
-      }catch(error){if(error instanceof PublicError)value={isError:true,content:[{type:'text',text:error.message}],structuredContent:{error:error.message}};else throw error;}
-    }else return json({jsonrpc:'2.0',id:rpc.id,error:{code:-32601,message:'Method not found.'}});
-    return json({jsonrpc:'2.0',id:rpc.id,result:value});
-  }catch(error){return json({jsonrpc:'2.0',id:rpc.id,error:{code:error instanceof PublicError?-32602:-32603,message:error instanceof PublicError?error.message:'Request unavailable.'}});}
+  // Use the SDK's serving entry so modern per-request envelopes, discovery,
+  // typed results and legacy stateless clients share the same registrations.
+  // Authentication remains the Sites boundary's responsibility, not the SDK's.
+  if(request.method==='POST'){
+    const rpc=await body(request.clone());
+    if(rpc?.method==='tools/call')user(request);
+  }
+  const handler=createMcpHandler(()=>{
+    const server=new McpServer({name:'FM1 App Library',version:'2.0.0',icons:ICONS},{
+      jsonSchemaValidator:new CfWorkerJsonSchemaValidator(),
+      instructions:'Open the FM1 device panel through this installed plugin. Inspect saved request IDs after a disconnect. Offline planning does not authorize app switching. Switching requires human confirmation and enabled bench capability.',
+    });
+    for(const tool of TOOLS){
+      const shape=Object.fromEntries(Object.entries(tool.inputSchema.properties).map(([key,schema])=>[
+        key,schema.enum?z.enum(schema.enum):z.string().regex(new RegExp(schema.pattern)),
+      ]));
+      registerAppTool(server,tool.name,{title:tool.title,description:tool.description,
+        inputSchema:z.object(shape).strict(),annotations:tool.annotations,icons:tool.icons,_meta:tool._meta||{}},async args=>{
+        try{
+          const data=await callTool(env,user(request),tool.name,args);
+          if(data._approval){const {_approval,...publicData}=data;return {...result(publicData),_meta:{approval_id:_approval}};}
+          return result(data);
+        }catch(error){
+          if(error instanceof PublicError)return {isError:true,content:[{type:'text',text:error.message}],structuredContent:{error:error.message}};
+          console.error('FM1 tool storage failure');
+          return {isError:true,content:[{type:'text',text:'The library is temporarily unavailable.'}]};
+        }
+      });
+    }
+    registerAppResource(server,'FM1 device panel',RESOURCE_URI,{},async()=>({contents:[{
+      uri:RESOURCE_URI,mimeType:'text/html;profile=mcp-app',text:UI_HTML,
+      _meta:{ui:{prefersBorder:true,csp:{connectDomains:[],resourceDomains:[]}},'openai/ui':{availableDisplayModes:['inline','fullscreen'],preferredDisplayMode:'fullscreen'}},
+    }]}));
+    return server;
+  },{legacy:'stateless',responseMode:'auto',maxRequestBodySize:65536,onerror:error=>console.error('FM1 MCP serving failure:',sanitize(error.message))});
+  return handler.fetch(request);
 }
 export async function handleFm1Request(request,env){
   const path=new URL(request.url).pathname;

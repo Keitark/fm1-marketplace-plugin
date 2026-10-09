@@ -1,4 +1,12 @@
-# Browser tools and MCP App panel
+# Native MCP App panel and browser tools
+
+The installed FM1 plugin and native MCP App panel are the user's primary
+interface. On 2026-10-09, native library/status/catalog/saved-job tools and the
+actual cached v1 panel's Refresh succeeded through the authenticated local relay.
+That panel still refreshes and inspects saved jobs after Site v2 deployment;
+rendering the new v2 resource is not yet accepted in the host.
+The full website's WebMCP tools are an additional interface; native plugin use
+requires no Chrome extension.
 
 The top-level FM1 Site registers six tools through
 `document.modelContext.registerTool` when the in-app browser supports WebMCP.
@@ -29,9 +37,10 @@ the server's owner-bound one-use approval, and deliberate local switching
 enablement. See [the relay contract](SITE_RELAY.md) for delivery, digest, expiry,
 and uncertainty handling.
 
-## Embedded panel
+## Native panel and SDK migration
 
-The iframe uses native MCP Apps, not the top-level WebMCP registry. It sends
+The iframe uses native MCP Apps, not the top-level WebMCP registry. The panel
+contract sends
 `ui/initialize`, receives host capabilities/context, then sends
 `ui/notifications/initialized`. The host's initial library tool result renders
 without a duplicate library request. If that result is absent, a bounded
@@ -42,7 +51,33 @@ result can still render without that capability. The iframe acknowledges
 `ui/resource-teardown`, aborts its lifecycle, clears approval state, and rejects
 pending requests. Page closure performs the same cleanup.
 
+Site version **2** pins **ext-apps 2.0.3** and official server SDK **2.3.1**.
+The current 41 Site tests, typecheck, production build, and native deployment
+passed. Actual SDK Client 2.3.1 negotiated **2026-07-28** and legacy
+**2025-11-25** protocols in memory. The new native UI resource is
+`ui://fm1/device-panel-v2.html`.
+
+The cached v1 panel's Refresh and saved-job inspection work through the v2
+server. A newly opened panel still shows **Choose what plays next.** and the
+older tool title. Rendering the new resource and its Apps SDK acceptance in
+the actual host remain pending cached metadata/resource refresh. No supported
+refresh tool is exposed, and restart/reinstall has not been verified as a fix.
+A direct deployed SDK Client probe using the relay service credential returned
+HTTP 401; it did not verify remote modern-protocol negotiation.
+
 ## Verification recorded on 2026-10-09
+
+The installed native plugin's open/status/catalog/job calls succeeded, and
+Refresh worked in the actual native MCP App iframe. Live Site WebMCP Refresh
+also worked through the local bridge/relay with switching disabled. Inventory
+reported COM4 and CDC/audio interfaces; all six validated private packages were
+blocked (`ready:false`) because no protected session or verified baseline was
+configured. The tested MDX plan was delivered but its bridge job failed with
+**Start a protected session on the laptop first**. No helper was created and
+no device I/O occurred. These live results verify metadata transport and
+prerequisite handling, not a successful plan or hardware acceptance.
+
+Earlier synthetic browser validation covered the complete six-tool contract:
 
 In a supported in-app browser, all six tools were discovered and called with
 valid input against the local HTTP synthetic relay. Library read/refresh,
@@ -54,11 +89,12 @@ browser's Confirm control was not clicked. A local SQLite read after stopping
 the fixture confirmed zero queued `switch_app` tasks; no device writes were
 performed.
 
-The 11 formal UI tests in `site/test/ui.test.mjs` passed. They cover initial
+The current **12 formal UI tests** in `site/test/ui.test.mjs` passed. They cover initial
 render without duplicate requests, initial render without `serverTools`,
 fallback, teardown, registry abort, nonce-free review, untrusted confirmation
 rejection, Cancel/Escape, one-use trusted confirmation, awaited job inspection,
-and malformed input rejection. The trusted-click test is a VM fixture, not a
+malformed input rejection, and the native device-controls view with a detected
+port and no duplicate refresh. The trusted-click test is a VM fixture, not a
 physical browser or hardware operation.
 
 ## Repeat the local fixture
@@ -96,5 +132,6 @@ installed dependencies. Do not use a deployed Site or real bridge credentials.
 
 The fixture accepts only the literal loopback origin on port 3000, imports no
 bridge or device backend, and returns synthetic metadata. These results do
-not establish deployed plugin entrypoints, an authenticated live bench relay,
-hardware write/readback/startup, sound, screen, keys, or physical acceptance.
+not establish actual native v2 resource rendering, remote modern negotiation, or hardware
+write/readback/startup, sound, screen, keys, or physical acceptance. Live native
+plugin and metadata relay evidence is recorded separately above.

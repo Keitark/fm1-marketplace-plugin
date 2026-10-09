@@ -5,17 +5,19 @@ import { RESOURCE_URI, TOOLS, validate, sanitize } from '../lib/fm1-contract.mjs
 import { database, connect, cacheCatalog, catalog, digest, seconds } from './d1.mjs';
 
 async function request(env,path,value,{owner='alice',relay=false,origin,method='POST'}={}){
-  const headers={'Content-Type':'application/json'};
+  const headers={'Content-Type':'application/json',Accept:'application/json, text/event-stream'};
   if(owner)headers['oai-authenticated-user-id']=owner;
   if(relay)headers.authorization='Bearer '+env.FM1_RELAY_TOKEN;
   if(origin)headers.origin=origin;
   const response=await handleFm1Request(new Request('https://fm1.test'+path,{method,headers,...(method==='POST'?{body:JSON.stringify(value)}:{})}),env);
-  return {status:response.status,body:response.status===202?null:await response.json()};
+  const raw=await response.text();
+  const data=response.headers.get('content-type')?.includes('text/event-stream')?raw.split('\n').filter(line=>line.startsWith('data: ')).at(-1)?.slice(6):raw;
+  return {status:response.status,body:data?JSON.parse(data):null};
 }
 const api=(env,name,args={},options)=>request(env,'/api/fm1',{name,arguments:args},options);
-const rpc=(env,method,params={},options)=>request(env,'/mcp',{jsonrpc:'2.0',id:7,method,params},options);
+const rpc=(env,method,params={},options)=>request(env,'/mcp',{jsonrpc:'2.0',id:7,method,params:method==='initialize'?{protocolVersion:'2025-11-25',capabilities:{},clientInfo:{name:'FM1 test',version:'1'},...params}:params},options);
 test('generated migration creates expected durable storage',()=>{const env=database();assert.equal(env.DB.sqlite.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type='table'").get().n,3);});
-test('private user authentication is required for API and MCP tool execution',async()=>{const env=database();assert.equal((await api(env,'open_fm1_library',{}, {owner:null})).status,401);assert.equal((await rpc(env,'tools/call',{name:'open_fm1_library'},{owner:null})).body.error.code,-32602);});
+test('private user authentication is required for API and MCP tool execution',async()=>{const env=database();assert.equal((await api(env,'open_fm1_library',{}, {owner:null})).status,401);assert.equal((await rpc(env,'tools/call',{name:'open_fm1_library'},{owner:null})).status,401);});
 test('foreign origin is rejected on both transports',async()=>{const env=database();assert.equal((await api(env,'open_fm1_library',{}, {origin:'https://evil.test'})).status,403);assert.equal((await rpc(env,'initialize',{}, {origin:'https://evil.test'})).status,403);});
 test('disconnected library remains visible with all five profiles',async()=>{const env=database();const data=await callTool(env,'alice','open_fm1_library',{});assert.equal(data.profiles.length,5);assert.equal(data.relay.connected,false);assert.equal(data.catalog,null);});
 test('disconnected metadata requests are not queued',async()=>{const env=database();await assert.rejects(callTool(env,'alice','get_fm1_status',{}),/offline/);assert.equal(env.DB.sqlite.prepare('SELECT count(*) AS n FROM relay_tasks').get().n,0);});

@@ -1,7 +1,9 @@
 # FM1 App Library user guide
 
-Open the private [FM1 App Library](https://fm1-app-library.keitark.chatgpt.site)
-and sign in with the owner account when prompted. The library uses the
+Use the installed **FM1 App Library** plugin in ChatGPT or Codex and ask it to
+open your FM1 app library. Its native panel is the primary interface selected
+for this integration. The private [FM1 App Library website](https://fm1-app-library.keitark.chatgpt.site)
+is also available; sign in with the owner account when prompted. Both use the
 [black/mint FM-1 mark](../site/public/fm1-icon.png).
 
 ## Install the ChatGPT/Codex plugin
@@ -11,29 +13,38 @@ card, then complete any sign-in prompts. If that offer is no longer visible,
 ask to reopen the installation offer for the provisioned plugin. There is no
 need to create another plugin or configure a local MCP server.
 
-Once connected, ask ChatGPT or Codex to open your FM1 app library. The plugin
-advertises a sidebar entry and a conversation panel. At the recorded
-2026-10-09 handoff, installation had been offered, but user connection and
-native panel rendering had not been confirmed. The website can be opened
-independently of plugin installation.
+The plugin advertises a sidebar entry and a conversation panel. On 2026-10-09,
+the installed plugin's library, status, catalog, and saved-job tools were
+verified, and **Refresh** worked in the actual native MCP App panel. No Chrome
+extension is required for this native plugin experience. The website can be
+opened independently of plugin installation.
 
-## What you can do without an FM1
+## Current bench state
 
-Browse the five app cards: **NES, Doom, MDX, Buddha, and ProTracker**. With no
-bench relay connected, **Bench disconnected**, **Offline**, and switching
-**Disabled** are expected. An empty library shows **No package connected**;
-the cards describe supported apps, not installed firmware or sample packages.
+Browse the five app cards: **NES, Doom, MDX, Buddha, and ProTracker**. The
+verified local relay is connected with switching **Disabled**. It reports six
+validated private package variants; all are currently blocked because the
+local bridge has no configured protected session or verified baseline.
 
-Fresh planning and switching controls stay disabled until the bench supplies
-real package metadata. Previously saved responses can remain visible after a
-disconnect. No FM1 is currently available for live acceptance, so the published
-Site is not evidence that a device has been connected or flashed.
+Inventory reported COM4 and CDC/audio interfaces. This verifies metadata
+transport, not a device write or physical acceptance. A tested MDX **View plan**
+request reached the bridge and failed with **Start a protected session on the
+laptop first**. That is an expected prerequisite failure; no protected helper
+was created and no device I/O occurred.
+
+If the relay later disconnects, **Bench disconnected** and **Offline** are
+expected. Saved responses can remain visible after a disconnect. With no
+private package metadata, cards show **No package connected**; the cards
+describe supported apps rather than installed firmware.
 
 ## When the bench is ready
 
-The bench owner first connects the existing bridge and outbound relay using
-[SITE_RELAY.md](SITE_RELAY.md). The Site does not start the bridge or prepare a
-device session.
+The metadata bridge and outbound relay are already connected in the recorded
+setup. Before planning can succeed or switching can be enabled, the bench
+owner must prepare and verify the protected session and unit-specific
+baseline through the established bench workflow. The Site does not prepare
+that session. See [SITE_RELAY.md](SITE_RELAY.md) for connection and recovery
+details; preserve an existing listener and its state.
 
 1. Click **Refresh** to load current inventory and package metadata.
 2. Choose a package variant on its app card. Check its **Ready/Blocked** state
@@ -67,6 +78,14 @@ Sector counts describe reported verified progress. They do not establish
 successful startup, screen output, sound, or working keys. An unknown device
 outcome needs inspection by the bench owner before another device operation.
 Physical acceptance remains a separate bench check.
+
+Site version 2 is deployed, and Refresh and saved-job inspection still work
+from the cached native panel. A newly opened panel currently keeps the older
+**Choose what plays next.** heading and tool title; the new device panel has
+not yet been accepted in the host. There is no exposed supported panel refresh
+tool, and restart/reinstall has not been verified as a fix. See
+[VERIFICATION.md](VERIFICATION.md) for the distinction between the tested v2
+server and the cached v1 panel.
 
 Further detail: [relay setup](SITE_RELAY.md), [browser tools and verification](WEBMCP.md),
 [integration handoff](INTEGRATION_HANDOFF.md), and [verification evidence](VERIFICATION.md).

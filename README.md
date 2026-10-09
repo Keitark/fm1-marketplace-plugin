@@ -7,17 +7,22 @@ The implementation includes the existing browser store/bridge, a Sites Worker
 with HTTP MCP at `/mcp`, a durable D1 request queue, an MCP App library panel,
 global/thread extension metadata, WebMCP registration, and an outbound Windows
 relay. The relay keeps the existing authenticated bridge and protected writer
-local. Private deployment, host/browser discovery, and live bench acceptance
-remain separate verification steps; see [VERIFICATION.md](docs/VERIFICATION.md).
+local. Version 2 is privately deployed with pinned server SDK 2.3.1 and
+ext-apps 2.0.3. Local tests/build and live metadata transport passed; rendering
+the new native v2 panel and physical bench acceptance remain separate checks.
+See [VERIFICATION.md](docs/VERIFICATION.md).
 
 The owner-private [FM1 App Library](https://fm1-app-library.keitark.chatgpt.site)
-is deployed and MCP-ready. Install its provisioned plugin to use native panels;
-installation/connection and live bench acceptance have not been confirmed.
-No FM1 is currently connected. The app and panel icon use an original black/mint
+is deployed and MCP-ready, and its plugin is installed. The cached native v1
+panel's Refresh and saved-job inspection work through the v2 server. A newly
+opened panel still shows the older heading/tool title, so v2 native rendering
+is not yet accepted. Local inventory reports COM4 and six blocked private
+packages; switching is disabled and no protected session is configured.
+The app and panel icon use an original black/mint
 FM-1 silhouette based on the physical front-panel arrangement.
 
 Start with the [user guide](docs/USER_GUIDE.md) for plugin installation, browsing
-without hardware, planning, saved-job recovery, and progress interpretation.
+the connected metadata panel, planning, saved-job recovery, and progress interpretation.
 
 `ChatGPT/Codex → private Site Worker → D1 queue ← outbound Windows relay → existing FM1 bridge → established protected session → FM1`
 
@@ -31,6 +36,7 @@ without hardware, planning, saved-job recovery, and progress interpretation.
 - `job_progress.py`: progress from persisted job/session metadata.
 - `site/lib/fm1-server.mjs`: authenticated MCP, user-owned requests, relay routes, and expiring app-switch approvals.
 - `site/lib/fm1-ui.mjs`: MCP App host bridge and top-level WebMCP library interface.
+- `site/lib/fm1-app-host.mjs`: native panel integration with the pinned MCP Apps SDK.
 - `site/lib/fm1-contract.mjs`: narrow tool schemas, extension metadata, and metadata projection.
 - `site/db/schema.ts` and `site/drizzle/`: durable D1 queue and approval schema.
 - `site_relay.py` and `start-site-relay.ps1`: outbound client, private local journal, and hidden unelevated launcher.
@@ -54,14 +60,20 @@ python -m unittest discover -s tools/jieli-wl82 -p 'test_*.py'
 node --test tools/jieli-wl82/test_remote_store.cjs
 ```
 
-The independent 2026-10-09 offline check passed **136 Python tests** and
-**10 browser-store JavaScript tests**, plus **36 Site tests**. All three PowerShell source scripts
-parsed successfully. The Python suite includes relay validation, durable
+The earlier 2026-10-09 aggregate check passed **136 Python tests** and
+**10 browser-store JavaScript tests**. After two privacy regressions were added,
+the focused relay suite passed **39 tests**; the Python aggregate was not
+rerun. The current Site suite passed **41 tests**: 25 server, 12 UI, and 4 SDK
+tests. All three PowerShell source scripts parsed successfully.
+The Python suite includes relay validation, durable
 same-ID recovery, switch digest/expiry checks, credential filtering, and the
 offline exception fix: failed planning no longer creates an unknown device
 outcome that blocks later device operations.
 
-Site typechecking and the production build passed. All six WebMCP tools were
+Site typechecking and the v2 production build passed. Actual SDK Client 2.3.1
+negotiated modern `2026-07-28` and legacy `2025-11-25` protocols in memory.
+Remote modern-protocol acceptance remains unverified; a direct deployed
+client probe returned HTTP 401. All six WebMCP tools were
 discovered and verified in a supported browser using a local synthetic HTTP
 relay; malformed input was rejected for every tool. See [WEBMCP.md](docs/WEBMCP.md).
 
@@ -96,7 +108,9 @@ protected writer. Transport delivery and bridge job outcome remain distinct:
 a delivered response can contain a failed or unknown job, and interrupted
 submissions are inspected by their saved ID without resubmission.
 
-For a future live rollout, verify the private MCP connection and a read-only
-relay round trip first, then native panel/extension behavior and WebMCP
-discovery. Device writes and physical screen/audio/control acceptance require
+The installed plugin and metadata relay already have live acceptance. The
+remaining host check is the v2 resource `ui://fm1/device-panel-v2.html` rather
+than a cached v1 panel. There is no exposed supported metadata/resource refresh
+tool; restart or reinstall has not been verified as a fix. Device writes and
+physical screen/audio/control acceptance require
 the established bench prerequisites and an explicitly confirmed operation.

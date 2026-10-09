@@ -1,5 +1,5 @@
 import { ICONS } from './fm1-icon.mjs';
-export const RESOURCE_URI = 'ui://fm1/app-library-v1.html';
+export const RESOURCE_URI = 'ui://fm1/device-panel-v2.html';
 export const PROFILES = [
   {profile:'nes',title:'NES',description:'Play your prepared cartridge collection.',symbol:'N'},
   {profile:'doom',title:'Doom',description:'The original engine, adapted for FM1.',symbol:'D'},
@@ -32,7 +32,7 @@ const schemas = {
   entry_method:{type:'string',enum:['serial','already_uboot']},
 };
 const definitions = [
-  ['open_fm1_library','Open app library','Open the FM1 app library and show the saved catalog, bridge connection and jobs.',[],true],
+  ['open_fm1_library','FM1 device panel','Open the installed FM1 plugin panel with device connection, packages and saved jobs.',[],true],
   ['get_fm1_status','Refresh bench status','Request inventory and persisted bridge/session state. No device I/O.',[],true],
   ['list_fm1_apps','Refresh app packages','Request validated package metadata and readiness; never returns firmware bytes.',[],true],
   ['plan_fm1_app','Plan app change','Submit an offline plan for an existing catalog ID. No device I/O. Returns a saved request ID; inspect it with get_fm1_request.',['catalog_id'],false],

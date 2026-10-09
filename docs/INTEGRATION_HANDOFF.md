@@ -7,11 +7,40 @@ WebMCP tools and outbound Windows relay alongside the original store/bridge
 source. The initial publication at `b024784` established the source foundation;
 the integration extends that work rather than replacing the protected writer.
 The owner-private [FM1 App Library](https://fm1-app-library.keitark.chatgpt.site)
-is deployed and MCP-ready. The provisioned plugin has been offered for installation;
-user connection and native panel rendering are unconfirmed. No FM1 is currently
-available, so the live bench relay and physical acceptance remain pending.
-The supported browser's six WebMCP tools passed synthetic execution and invalid-input
-checks. Local tests/builds do not prove a device write.
+is deployed and MCP-ready. The plugin is installed: library, status, catalog,
+and saved-job tools have succeeded. Refresh worked in the actual native MCP
+App iframe, and live Site WebMCP Refresh worked through the authenticated
+local relay. The native plugin/panel is the user's selected primary interface;
+it does not require a Chrome extension.
+
+The local bridge currently has no configured protected session or official
+updater. Inventory reported COM4 and CDC/audio interfaces, and six validated
+private packages all remained `ready:false`. An MDX plan reached the bridge
+but correctly failed on the protected-session prerequisite. No helper was
+created and no device I/O, firmware write, or physical acceptance occurred.
+The browser's six WebMCP tools also passed earlier synthetic execution and
+invalid-input checks.
+
+## SDK deployment and remaining native-panel acceptance
+
+Site version **2** pins official server SDK **2.3.1** and **ext-apps 2.0.3**.
+The current Site suite passed **41 tests** (25 server, 12 UI, 4 SDK), typechecking
+and the production build passed, and deployment
+`appgdep_6ac8f089484881919b4e10b89ef4f608` succeeded with runtime revision 1
+and MCP-ready status. Its source SHA is
+`5d32bd0c023d4a3d7ef77fb454164844131a29d0`. Actual SDK Client 2.3.1 negotiated
+current **2026-07-28** and legacy **2025-11-25** protocols in memory.
+
+After deployment, the cached native v1 panel successfully refreshed status
+and catalog and inspected the original failed MDX job through the v2 server.
+A newly opened native panel still shows **Choose what plays next.** and the
+older tool title. Rendering `ui://fm1/device-panel-v2.html` through the host
+and acceptance of its Apps SDK remain pending cached metadata/resource
+refresh. No supported refresh tool is exposed, and restart/reinstall has not
+been verified as a fix. A direct deployed SDK Client probe using the existing
+relay service credential returned **HTTP 401**, so modern remote protocol
+negotiation is not accepted by that check. See [VERIFICATION.md](VERIFICATION.md)
+for the exact evidence and remaining boundaries.
 
 ## Architecture
 
@@ -56,6 +85,8 @@ no per-write consent field; the adapter owns this approval boundary.
 Only metadata crosses the relay. Keep private catalog bundle JSON, firmware,
 ROM/music inputs, baseline images, session descriptors, receipts, device paths
 and tokens local. Low-level recovery/helper management remains a bench operation.
+Serial numbers, PnP unit identifiers, and related physical identity fields are
+also filtered before Site results and local relay result journals are saved.
 `serial_status` and `read_firmware` are device operations, not passive metadata
 reads; firmware read setup can alter loader/protection state.
 
@@ -70,13 +101,27 @@ Unknown device outcomes retain the bridge's persistent block and require local
 inspection. Offline backend exceptions now produce `failed`, so a failed
 `plan_app`, `plan` or `environment` request does not create device uncertainty.
 
-Rollout requires an idle, established bridge and an existing verified protected
-session. The relay never launches or restarts the bridge or replaces its state.
+Metadata rollout now uses the supported local bridge on loopback port 9770
+(observed PID 134988) and relay (observed PID 411680), with switching disabled.
+These process IDs are dated evidence, not future launch configuration. The
+relay never launches or restarts the bridge or replaces its state.
 Do not substitute a new state directory, clear latches or change a frozen helper
 to bring the Site online. Inspect live launcher/session selection before any
-operational change. Verify the privately deployed MCP connection and a read-only
-relay round trip before separately accepting native entrypoints, WebMCP discovery
-and any explicitly authorized hardware operation.
+operational change. The older protected snapshot worker is stopped and lacks
+the required remote-read guard, and the remote laptop is offline. Do not
+reactivate that worker or infer that its historical session is usable locally.
+
+The saved MDX plan request/job `d984e14543204d1e93a966099cc708d7` was delivered
+successfully but has authoritative status `failed` with **Start a protected
+session on the laptop first**. Inspection request
+`68060f826e704d2d8075321d4461577d` verified the original saved job. It used no
+device I/O. This is current evidence of transport and prerequisite handling,
+not successful planning or device acceptance.
+
+Before device operations, establish an idle verified protected session and
+unit-specific baseline through the bench workflow. Separately accept the
+new v2 resource's host behavior, any explicitly authorized hardware
+operation, and physical screen/audio/control behavior.
 
 ## Provenance and ownership
 

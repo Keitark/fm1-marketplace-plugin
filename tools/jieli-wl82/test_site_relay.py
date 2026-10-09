@@ -145,6 +145,25 @@ class ValidationTests(unittest.TestCase):
         self.assertEqual(result["nested"], [{"title": "safe"}])
         self.assertEqual(result["baseline_sha256"], "a" * 64)
 
+    def test_recursive_projection_removes_physical_identifiers_preserving_inventory(self):
+        identifiers = {key: "synthetic-unique-identity" for key in (
+            "serial_number", "SerialNumber", "SERIAL_NUMBER", "serial_no",
+            "device_serial_number", "usb_serial_number", "PNPDeviceID",
+            "pnp_device_id", "PNP_DEVICE_ID", "pnp_id", "device_instance_id",
+            "hardware_id", "hardware_ids", "physical_device_id",
+            "device_unique_id", "device_uuid")}
+        inventory = {"serial_ports": [{"port": "COM7", "vid": 0x3654,
+            "pid": 0x5155, "description": "Synthetic FM1 serial port", **identifiers}],
+            "uboot_disks": [{"Model": "WL82 UBOOT1.00 USB Device", **identifiers}],
+            "session_configured": True, "device_io": False, "blocked": True}
+        result = relay.metadata_only({"device": inventory})
+        self.assertEqual(result, {"device": {
+            "serial_ports": [{"port": "COM7", "vid": 0x3654, "pid": 0x5155,
+                              "description": "Synthetic FM1 serial port"}],
+            "uboot_disks": [{"Model": "WL82 UBOOT1.00 USB Device"}],
+            "session_configured": True, "device_io": False, "blocked": True}})
+        self.assertNotIn(b"synthetic-unique-identity", relay.json_bytes(result))
+
 
 class RelayTests(unittest.TestCase):
     def setUp(self):
@@ -391,6 +410,23 @@ class RelayTests(unittest.TestCase):
             raw = path.read_bytes()
             self.assertNotIn(BRIDGE_TOKEN.encode(), raw)
             self.assertNotIn(b"private", raw)
+
+    def test_physical_identifiers_never_reach_site_result_or_journal(self):
+        self.bridge.metadata = {"engine": {"blocked_unknown": True}, "device": {
+            "serial_ports": [{"port": "COM7", "serial_number": "synthetic-unit-serial"}],
+            "uboot_disks": [{"Model": "WL82 UBOOT1.00 USB Device",
+                             "PNPDeviceID": "synthetic-unit-pnp-identity"}],
+            "device_io": False}}
+        value = task()
+        self.site.tasks = [value]
+        self.relay.run_once()
+        result = [body for _, route, body in self.site.calls if route == "/relay/result"][0]
+        self.assertEqual(result["data"]["device"]["serial_ports"], [{"port": "COM7"}])
+        self.assertEqual(result["data"]["device"]["uboot_disks"], [{"Model": "WL82 UBOOT1.00 USB Device"}])
+        self.assertTrue(result["data"]["engine"]["blocked_unknown"])
+        for raw in (relay.json_bytes(result), self.relay._path(value["id"]).read_bytes()):
+            self.assertNotIn(b"synthetic-unit-serial", raw)
+            self.assertNotIn(b"synthetic-unit-pnp-identity", raw)
 
     def test_task_cannot_copy_configured_credentials_into_private_journal(self):
         token = "e" * 64

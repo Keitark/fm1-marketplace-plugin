@@ -39,6 +39,11 @@ SAFE_SESSION_KEYS = frozenset({
     "operation", "blocked", "reset_pending", "needs_observation", "failed_operation",
     "error", "baseline_sha256", "loader_running", "stopped", "remote_read_supported",
 })
+PHYSICAL_IDENTIFIER_KEYS = frozenset({
+    "serialnumber", "serialno", "deviceserialnumber", "usbserialnumber",
+    "pnpdeviceid", "pnpid", "deviceinstanceid", "hardwareid", "hardwareids",
+    "physicaldeviceid", "deviceuniqueid", "deviceuuid",
+})
 DROP = object()
 
 
@@ -184,6 +189,12 @@ def metadata_only(value: Any, secrets: tuple[str, ...] = (), depth: int = 0) -> 
                     any(secret in key for secret in secrets)):
                 continue
             compact = re.sub(r"[^a-z0-9]", "", key.lower())
+            # Inventory can contain a unit's persistent physical identity even
+            # when the value is plain text rather than a detectable local path.
+            # Match whole normalized field names so port/model/readiness data
+            # remains available, including containers such as serial_ports.
+            if compact in PHYSICAL_IDENTIFIER_KEYS:
+                continue
             sensitive = SENSITIVE_KEY.search(key) or any(
                 marker in compact for marker in ("image", "firmware", "token", "secret", "credential", "password", "payload"))
             if sensitive and not key.endswith("_sha256"):

@@ -4,8 +4,35 @@
 polls the private hosted Site using outbound HTTPS and forwards a small set of
 operations to the existing authenticated bridge. It imports no USB/serial
 backend and does not start, restart, configure, or replace the bridge or its
-protected writer session. Source and synthetic offline tests are provided;
-running-device and hosted-plugin acceptance require the separate live setup.
+protected writer session. The installed plugin, cached native v1 panel,
+website, and live relay have passed metadata round trips. After Site version 2
+deployment, cached-panel Refresh and saved-job inspection still worked through
+the new server. Rendering the new native v2 resource remains unverified.
+Protected-session preparation,
+device operations, and physical acceptance remain separate bench work.
+
+## Verified metadata setup on 2026-10-09
+
+The supported local bridge was launched on loopback port 9770 without a
+`SessionRoot` or official updater; the observed process ID was 134988. The
+outbound relay's observed process ID was 411680, with switching disabled.
+These are dated observations, not permanent process identities. Inspect the
+current listener/process before any future launch and do not start duplicates.
+
+Inventory reported COM4 and CDC/audio interfaces. Six validated private
+packages were listed, all with `ready:false`. The missing protected session
+and verified baseline intentionally keep device switching unavailable.
+Installed plugin status/catalog/job calls, native-panel Refresh, and live
+Site WebMCP Refresh worked through this relay.
+
+The MDX plan request/bridge job `d984e14543204d1e93a966099cc708d7` had delivery
+`succeeded` and authoritative bridge status `failed`, with the prerequisite
+message **Start a protected session on the laptop first**. Saved-job inspection
+used delivery request `68060f826e704d2d8075321d4461577d`. No device I/O or
+protected-helper creation occurred. The older snapshot worker is stopped and
+lacks the required remote-read guard; it must not be reactivated as a shortcut.
+The remote laptop is offline, so its earlier protected setup is not current
+local session evidence.
 
 ## Authentication and origins
 
@@ -109,6 +136,9 @@ Results are metadata only. Recursive projection removes image/firmware payload
 fields, credentials, paths, private session descriptors, binary values, long
 encoded material, and strings containing configured secrets. Safe session
 readiness flags, bridge blocked/unknown state, hashes, and progress remain.
+Physical unit identifiers such as serial numbers and PnP device identifiers
+are filtered recursively, including case and snake-case variants. Port,
+VID/PID, description/model, and safe readiness flags remain available.
 Detailed diagnostics and all firmware/ROM/music bytes stay on the laptop.
 
 ## Durability and uncertainty
@@ -147,3 +177,10 @@ redirect rejection, JSON bounds, sensitive result filtering, switch gating,
 duplicate task and process exclusion, interrupted submission/restart recovery,
 batch persistence, and lost Site acknowledgments. They neither connect to the
 actual Site nor start any device operation.
+
+The latest focused relay run passed **39 tests**, including recursive physical
+identifier filtering in results and the journal. The earlier aggregate Python
+run contained 136 tests and 37 relay tests; that aggregate was not rerun after
+the two new identifier regressions. See [VERIFICATION.md](VERIFICATION.md) for
+current live metadata evidence, the accepted v2 SDK tests/build/deployment,
+and the remaining native v2 panel/remote modern-protocol checks.
