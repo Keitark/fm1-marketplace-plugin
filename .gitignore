@@ -1,0 +1,38 @@
+# Python and local development
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+node_modules/
+.sites-runtime/
+
+# Credentials and runtime state
+.env
+.env.*
+!.env.example
+*.token
+token.txt
+tokens/
+credentials/
+session.json
+state.json
+launch.json
+*.log
+
+# Device data and private firmware/music/game inputs
+private-*/
+tmp/
+runtime/
+writer-setup/
+*.bin
+*.rom
+*.nes
+*.wad
+*.mdx
+*.pdx
+*.mod
+*.zip
+*.7z
+*.exe
+*.dll
+*.whl

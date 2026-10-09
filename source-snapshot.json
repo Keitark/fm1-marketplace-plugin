@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "snapshot_date": "2026-10-09",
+  "description": "Source-only snapshot of the active progress-kit store and bridge; no upstream Git history imported.",
+  "files": [
+    {
+      "path": "tools/jieli-wl82/remote_store.html",
+      "source": "progress-kit/fm1-remote/tools/jieli-wl82/remote_store.html",
+      "bytes": 22411,
+      "sha256": "ade8917172ab563a3b1afd6ab8276640614ce3c81ff73efe913f4bab31a107c7"
+    },
+    {
+      "path": "tools/jieli-wl82/remote_bridge.py",
+      "source": "progress-kit/fm1-remote/tools/jieli-wl82/remote_bridge.py",
+      "bytes": 36323,
+      "sha256": "fd5180f5b2a0eb81ec0c20a21e4b6bd37474b192fd8f98e1a31fe84e9775eb54"
+    },
+    {
+      "path": "tools/jieli-wl82/remote_backend.py",
+      "source": "progress-kit/fm1-remote/tools/jieli-wl82/remote_backend.py",
+      "bytes": 15665,
+      "sha256": "6032618ad4d09001460ab4b3f4e61682f736034ac8b416e02a9ecab92794fc78"
+    },
+    {
+      "path": "tools/jieli-wl82/remote_catalog.py",
+      "source": "progress-kit/fm1-remote/tools/jieli-wl82/remote_catalog.py",
+      "bytes": 5319,
+      "sha256": "4891f5f5bf5ff71e60c7ecf9c45abb9d047b300188bc584e926449dd6add8a96"
+    },
+    {
+      "path": "tools/jieli-wl82/remote_client.py",
+      "source": "progress-kit/fm1-remote/tools/jieli-wl82/remote_client.py",
+      "bytes": 7160,
+      "sha256": "f18dca3261cd7f84ffb9db7cb4e79e88cc268f255c09ba2d4ec92076bdd99f6c"
+    },
+    {
+      "path": "tools/jieli-wl82/job_progress.py",
+      "source": "progress-kit/fm1-remote/tools/jieli-wl82/job_progress.py",
+      "bytes": 10706,
+      "sha256": "00ecc69c78ad5c5974f1cd6d00119ca2c42992d8c283e3cfa30aebb1784c63fe"
+    },
+    {
+      "path": "tools/jieli-wl82/start-remote-bridge.ps1",
+      "source": "progress-kit/fm1-remote/tools/jieli-wl82/start-remote-bridge.ps1",
+      "bytes": 15239,
+      "sha256": "0a5d01b3aff90ee232cb1798bc27ff07ec99fa41145a38d0b3c4fde5e5c5c02a"
+    },
+    {
+      "path": "tools/jieli-wl82/flash-session-client.ps1",
+      "source": "progress-kit/fm1-remote/tools/jieli-wl82/flash-session-client.ps1",
+      "bytes": 3609,
+      "sha256": "f5cda704082cde630f542fadea5e45b35a63f9b7e62da5fc0281b53dd563c46b"
+    },
+    {
+      "path": "tools/jieli-wl82/requirements-remote.txt",
+      "source": "progress-kit/fm1-remote/tools/jieli-wl82/requirements-remote.txt",
+      "bytes": 251,
+      "sha256": "931eea3525d89be8dec2ed3cee8200c25e15e8cb39cde1723b179ea83029f27f"
+    },
+    {
+      "path": "tools/jieli-wl82/test_remote_bridge.py",
+      "source": "progress-kit/fm1-remote/tools/jieli-wl82/test_remote_bridge.py",
+      "bytes": 28835,
+      "sha256": "3664e473de37ce7b79e883b7fb20c599350e8567e31be60032bceff8ff4f78cc"
+    },
+    {
+      "path": "tools/jieli-wl82/test_remote_backend.py",
+      "source": "progress-kit/fm1-remote/tools/jieli-wl82/test_remote_backend.py",
+      "bytes": 24682,
+      "sha256": "357f2376b6022611b5d8600ed577ab5a08adbb27cb0965d46cca976f16cb2ec2"
+    },
+    {
+      "path": "tools/jieli-wl82/test_remote_client.py",
+      "source": "progress-kit/fm1-remote/tools/jieli-wl82/test_remote_client.py",
+      "bytes": 3069,
+      "sha256": "d4846406a97115e96549e2bd7ca5b56570590b3ecc4630c4d7e0d2c0937dbf66"
+    },
+    {
+      "path": "tools/jieli-wl82/test_job_progress.py",
+      "source": "progress-kit/fm1-remote/tools/jieli-wl82/test_job_progress.py",
+      "bytes": 18686,
+      "sha256": "e6607026f3ea286ac27f82bcd2e06d92df66f17c993a741e7c6f1795b72480ac"
+    },
+    {
+      "path": "tools/jieli-wl82/test_remote_store.cjs",
+      "source": "progress-kit/fm1-remote/tools/jieli-wl82/test_remote_store.cjs",
+      "bytes": 10411,
+      "sha256": "23e0945f329340e1fa93e956f531527e1dd334b23901a60123cad75492703eef"
+    }
+  ]
+}

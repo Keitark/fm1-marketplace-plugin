@@ -1,0 +1,8 @@
+# Preserve imported source bytes so snapshot hashes are portable.
+tools/jieli-wl82/* -text
+
+# Normalize repository documentation and metadata.
+*.md text eol=lf
+*.json text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
