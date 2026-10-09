@@ -16,6 +16,9 @@ installation/connection and live bench acceptance have not been confirmed.
 No FM1 is currently connected. The app and panel icon use an original black/mint
 FM-1 silhouette based on the physical front-panel arrangement.
 
+Start with the [user guide](docs/USER_GUIDE.md) for plugin installation, browsing
+without hardware, planning, saved-job recovery, and progress interpretation.
+
 `ChatGPT/Codex → private Site Worker → D1 queue ← outbound Windows relay → existing FM1 bridge → established protected session → FM1`
 
 ## Source layout
