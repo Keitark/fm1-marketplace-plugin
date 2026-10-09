@@ -1,0 +1,105 @@
+import { ICON_DATA_URI, ICON_SVG } from './fm1-icon.mjs';
+export const UI_HTML = String.raw`<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FM1 App Library</title><meta name="description" content="Your private FM1 apps, reviewed package plans and saved job progress."><link rel="icon" href="${ICON_DATA_URI}">
+<style>
+:root{color-scheme:light;--paper:#f6f5ee;--ink:#253023;--muted:#687162;--line:#dadfd1;--accent:#ae542f;--green:#476840}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 system-ui,Segoe UI,sans-serif}button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:3px solid #c17a50;outline-offset:3px}header{display:flex;align-items:center;justify-content:space-between;padding:23px 32px;border-bottom:1px solid var(--line);background:#fffef9}.brand{font-size:22px;letter-spacing:-1px;font-weight:800}.brand span{color:var(--accent)}.badge{border-radius:30px;padding:7px 13px;background:#e9ecdf;font-size:12px;display:flex;gap:8px;align-items:center}.dot{width:7px;height:7px;border-radius:50%;background:#949b8d}.online .dot{background:#4c7645}main{max-width:1200px;margin:auto;padding:30px 32px 44px}.heading{display:flex;align-items:flex-end;justify-content:space-between;gap:15px;margin-bottom:24px}.eyebrow{font-size:11px;letter-spacing:1.8px;text-transform:uppercase;color:var(--muted);font-weight:700}h1{font-size:35px;line-height:1.15;letter-spacing:-1.4px;margin:8px 0}h2{font-size:17px;letter-spacing:-.3px;margin:0 0 14px}p{margin:0}.muted{color:var(--muted)}.layout{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:24px}.library{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.card{padding:23px;background:#fffef9;border:1px solid var(--line);border-radius:13px;display:flex;flex-direction:column;gap:10px;min-height:266px}.card:last-child{grid-column:1/-1;min-height:210px}.cardtop{display:flex;align-items:center;justify-content:space-between}.icon{font-size:24px;font-weight:800;width:50px;height:50px;border-radius:12px;display:grid;place-items:center;background:#e5e9dc}.icon.doom{background:#f1ded3;color:#a9502d}.icon.mdx{background:#e2e5f1;color:#59648b}.icon.buddha{background:#ede7d1;color:#827133}.icon.protracker{background:#deebe0;color:#426a4d}.tag{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}.card h2{font-size:23px;margin:5px 0 0}.card p{font-size:13px;color:var(--muted)}.card select{margin-top:auto}.actions{display:flex;gap:8px}.actions>*{flex:1}.primary,.secondary{border-radius:7px;padding:9px 12px;font-weight:600;font-size:13px}.primary{background:var(--accent);color:#fff;border:1px solid var(--accent)}.secondary{color:var(--ink);background:transparent;border:1px solid var(--line)}.panel{background:#ebeee2;border:1px solid var(--line);border-radius:13px;padding:21px;margin-bottom:17px}.state{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid #d9dfce;font-size:12px}.state strong{font-weight:650}.note{font-size:12px;color:var(--muted);margin-top:12px}.panel label{display:block;font-size:12px;margin:15px 0 6px}input,select{width:100%;padding:9px 10px;border:1px solid #cdd5c2;border-radius:6px;background:#fffef9;color:var(--ink)}.saved{grid-column:1/-1;background:#263125;color:#edf1e6;border-radius:13px;padding:22px;margin-top:4px}.saved header{padding:0 0 14px;background:transparent;border:0}.saved h2{margin:0}.jobline{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid #ffffff1c}.jobline button{background:transparent;color:#dde4d2;border:0;padding:0;text-align:left;font-size:12px}.jobline code{font-size:11px;overflow-wrap:anywhere}progress{width:100%;accent-color:#c88355;margin:13px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 ui-monospace,Consolas,monospace;margin:12px 0 0;max-height:240px;overflow:auto}.message{font-size:13px;margin-bottom:16px;min-height:20px;color:#884223}.digest{font:11px/1.5 ui-monospace,Consolas,monospace;overflow-wrap:anywhere;color:var(--muted)}dialog{width:min(520px,calc(100% - 30px));border:1px solid var(--line);border-radius:15px;padding:27px;background:#fffef9;color:var(--ink)}dialog::backdrop{background:#18201790}dialog h2{font-size:23px}dialog .actions{margin-top:22px}.confirmation{background:#f3ece1;padding:16px;border-radius:8px;margin:14px 0;font-size:13px}footer{margin-top:25px;color:var(--muted);font-size:12px}a{color:inherit}.empty{font-size:12px;color:var(--muted);margin-top:auto}.retry{margin-top:12px;width:100%}@media(max-width:880px){.layout{grid-template-columns:1fr}.sidebar{display:grid;grid-template-columns:1fr 1fr;gap:16px}.panel{margin:0}}@media(max-width:560px){header{padding:18px 20px}main{padding:24px 20px}.heading{align-items:flex-start}h1{font-size:29px}.library,.sidebar{grid-template-columns:1fr}.card:last-child{grid-column:auto}.badge{max-width:150px}.saved{padding:18px}}
+</style></head><body>
+<header><div class="brand" style="display:flex;align-items:center;gap:10px"><span style="width:48px;height:48px;display:inline-flex">${ICON_SVG}</span><span>FM<span>1</span> <span style="font-weight:450;color:#65715e">/ App library</span></span></div><div class="badge" id="connection"><span class="dot"></span><span id="connection-label">Checking bench</span></div></header>
+<main><div class="heading"><div><div class="eyebrow">Your private bench</div><h1>Choose what plays next.</h1><p class="muted">Review the package. Follow the saved job.</p></div><button class="secondary" id="refresh">Refresh</button></div>
+<div class="message" id="message" role="status" aria-live="polite"></div>
+<div class="layout"><section class="library" id="library" aria-label="FM1 apps"></section>
+<aside class="sidebar"><section class="panel"><h2>Bench connection</h2><div class="state"><span>Relay</span><strong id="relay-state">Checking</strong></div><div class="state"><span>Device jobs</span><strong id="device-state">Unavailable</strong></div><div class="state"><span>App switching</span><strong id="switch-state">Disabled</strong></div><p class="note" id="bench-note">Fresh package and device metadata appear when the private relay is connected.</p><a class="note" style="display:block" href="https://github.com/Keitark/fm1-marketplace-plugin/blob/main/docs/SITE_RELAY.md" target="_blank" rel="noreferrer">Bench connection setup ↗</a></section>
+<section class="panel"><h2>Inspect a saved job</h2><p class="note">Use its original ID to resume progress after a disconnect.</p><label for="job-id">Job ID</label><input id="job-id" placeholder="32-character saved job ID" maxlength="32" autocomplete="off" spellcheck="false"><button class="secondary retry" id="inspect">Inspect job</button><p class="note">A plan checks compatibility offline. App switching needs a separate confirmation.</p></section></aside>
+<section class="saved"><header><h2>Saved requests & progress</h2><span id="count" style="font-size:12px;color:#b5c0ac">0 requests</span></header><div id="requests"><p style="font-size:13px;color:#b5c0ac">Your requests will appear here.</p></div><div id="progress" hidden><progress id="progress-bar" aria-label="Verified sector progress"></progress><p id="progress-text" style="font-size:12px"></p></div><pre id="detail" aria-live="polite"></pre></section></div>
+<footer>Package readiness and verified startup are shown separately. Screen, sound and keys still need bench acceptance.</footer></main>
+<dialog id="approval"><h2>Confirm app switch</h2><p class="muted">This writes the reviewed app package and restarts your FM1.</p><div class="confirmation" id="review"></div><p class="note">Keep the device connected. The protected bench session checks the exact package and write scope.</p><div class="actions"><button class="secondary" id="cancel">Cancel</button><button class="primary" id="confirm">Confirm app switch</button></div></dialog>
+<script>
+(() => {
+  const el = id => document.getElementById(id);
+  const esc = value => String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const profiles=[{profile:'nes',title:'NES',description:'Play your prepared cartridge collection.',symbol:'N'},{profile:'doom',title:'Doom',description:'The original engine, adapted for FM1.',symbol:'D'},{profile:'mdx',title:'MDX',description:'FM music playback and keyboard performance.',symbol:'M'},{profile:'buddha',title:'Buddha',description:'An Amiga module performance.',symbol:'B'},{profile:'protracker',title:'ProTracker',description:'Explore and perform tracker music.',symbol:'P'}];
+  let state={profiles,relay:{connected:false,allow_switch:false},recent_requests:[]},activeApproval=null,activeReview=null,disposed=false,hostReady=false,hostCapabilities={},nextId=1,initialPayload=false;
+  const embedded=window.parent!==window, pending=new Map(),lifecycle=new AbortController();
+  function tell(message){el('message').textContent=message||'';}
+  function hostRequest(method,params){const id=nextId++;return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(id);reject(new Error('Panel connection timed out. Inspect your saved request; do not submit another.'));},15000);pending.set(id,{resolve,reject,timer});window.parent.postMessage({jsonrpc:'2.0',id,method,params},'*');});}
+  window.addEventListener('message',event=>{
+    if(event.source!==window.parent||!event.data||event.data.jsonrpc!=='2.0')return;
+    const m=event.data;
+    if(m.method==='ui/resource-teardown'){if(m.id!==undefined)window.parent.postMessage({jsonrpc:'2.0',id:m.id,result:{}},'*');dispose();return;}
+    if(m.id!==undefined&&pending.has(m.id)){const item=pending.get(m.id);pending.delete(m.id);clearTimeout(item.timer);m.error?item.reject(new Error(m.error.message||'Panel request failed.')):item.resolve(m.result);}
+    if(m.method==='ui/notifications/tool-result'&&m.params?.structuredContent){const output=m.params.structuredContent;if(output.profiles){initialPayload=true;state=output;render();}}
+  },{signal:lifecycle.signal});
+  async function call(name,args={}){
+    let answer;
+    if(embedded){if(!hostReady||!hostCapabilities.serverTools)throw new Error('This panel host has not enabled library tools.');answer=await hostRequest('tools/call',{name,arguments:args});}
+    else{const response=await fetch('/api/fm1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,arguments:args}),signal:lifecycle.signal});answer=await response.json();if(!response.ok)throw new Error(answer.error||'Request failed.');}
+    if(answer.isError)throw new Error(answer.structuredContent?.error||answer.content?.[0]?.text||'Request failed.');
+    const data=answer.structuredContent||{};
+    if(answer._meta?.approval_id)activeApproval=answer._meta.approval_id;
+    if(data._approval){activeApproval=data._approval;delete data._approval;}
+    return data;
+  }
+  function render(){
+    const connected=!!state.relay?.connected;
+    el('connection').className='badge'+(connected?' online':'');el('connection-label').textContent=connected?'Bench connected':'Bench disconnected';
+    el('relay-state').textContent=connected?'Connected':'Offline';el('switch-state').textContent=connected&&state.relay.allow_switch?'Enabled':'Disabled';
+    const inv=state.inventory, engine=inv?.engine||inv;
+    el('device-state').textContent=!inv?'Unavailable':engine?.blocked_unknown?'Outcome unknown':engine?.active?'Busy':'Inventory available';
+    el('bench-note').textContent=connected?'Package readiness comes from the saved bench response. Refresh before reviewing a change.':'Connect the private bench relay to refresh packages and inspect jobs. Saved responses remain available.';
+    el('library').innerHTML=(state.profiles||profiles).map(app=>{
+      const entry=state.catalog?.apps?.find(item=>item.profile===app.profile),variants=entry?.variants||[];
+      return '<article class="card"><div class="cardtop"><div class="icon '+esc(app.profile)+'">'+esc(app.symbol||app.title[0])+'</div><span class="tag">'+(variants.length?variants.length+' package'+(variants.length===1?'':'s'):'No package connected')+'</span></div><h2>'+esc(app.title)+'</h2><p>'+esc(app.description)+'</p>'+(variants.length?'<select aria-label="'+esc(app.title)+' variant" data-profile="'+esc(app.profile)+'">'+variants.map(v=>'<option value="'+esc(v.id)+'">'+esc(v.title)+' · '+esc(v.variant)+'</option>').join('')+'</select><div class="digest" data-digest="'+esc(app.profile)+'"></div>':'<p class="empty">Your private variants will appear after the bench connects.</p>')+'<div class="actions"><button class="secondary" data-plan="'+esc(app.profile)+'" '+(!connected||!variants.length?'disabled':'')+'>View plan</button><button class="primary" data-switch="'+esc(app.profile)+'" '+(!connected||!variants.length||!state.relay.allow_switch?'disabled':'')+'>Review switch</button></div></article>';
+    }).join('');
+    el('library').querySelectorAll('select').forEach(select=>{const paint=()=>{const v=selected(select.dataset.profile);el('library').querySelector('[data-digest="'+select.dataset.profile+'"]').textContent=(v?.ready?'Ready · ':'Blocked · ')+(v?.reason||'')+'\nSHA256 '+(v?.sha256||'');};select.onchange=paint;paint();});
+    el('library').querySelectorAll('[data-plan]').forEach(button=>button.onclick=()=>clickAction(()=>plan(selected(button.dataset.plan)?.id)));
+    el('library').querySelectorAll('[data-switch]').forEach(button=>button.onclick=()=>clickAction(()=>stage(selected(button.dataset.switch)?.id,'serial')));
+    const requests=state.recent_requests||[];el('count').textContent=requests.length+' request'+(requests.length===1?'':'s');
+    el('requests').innerHTML=requests.length?requests.map(r=>'<div class="jobline"><button data-request="'+esc(r.id)+'">'+esc(r.operation)+'<br><code>'+esc(r.id)+'</code></button><span style="font-size:12px">'+esc(r.state)+'</span></div>').join(''):'<p style="font-size:13px;color:#b5c0ac">Your requests will appear here.</p>';
+    el('requests').querySelectorAll('[data-request]').forEach(button=>button.onclick=()=>action(()=>inspectRequest(button.dataset.request)));
+  }
+  function selected(profile){const select=el('library').querySelector('[data-profile="'+profile+'"]');return state.catalog?.apps?.find(a=>a.profile===profile)?.variants?.find(v=>v.id===select?.value);}
+  function showData(data){el('detail').textContent=JSON.stringify(data,null,2);const p=data?.progress;el('progress').hidden=!p;if(p){const bar=el('progress-bar');if(Number.isFinite(p.total_sectors)&&p.total_sectors>0&&Number.isFinite(p.verified_sectors)){bar.max=p.total_sectors;bar.value=p.verified_sectors;}else bar.removeAttribute('value');el('progress-text').textContent=(data.status||'')+' · '+(p.phase||'')+' · '+(p.message||'')+' · '+(p.verified_sectors??'?')+'/'+(p.total_sectors??'?')+' sectors verified';}}
+  async function snapshot(){state=await call('open_fm1_library');render();return state;}
+  async function inspectRequest(id){if(!/^[a-f0-9]{32}$/.test(id))throw new Error('Use a saved request ID.');const data=await call('get_fm1_request',{request_id:id});showData(data.data??data);await snapshot();return data;}
+  async function settle(queued){if(!queued.request_id)return queued;el('job-id').value=queued.job_id||'';showData(queued);await snapshot();for(let attempt=0;attempt<12&&!disposed;attempt++){await new Promise(resolve=>setTimeout(resolve,1000));const delivery=await call('get_fm1_request',{request_id:queued.request_id});if(!['pending','dispatched'].includes(delivery.state)){if(delivery.state!=='succeeded')throw new Error(delivery.error||'Delivery outcome needs inspection. Resume the saved request ID.');showData(delivery.data);await snapshot();return delivery.data;}}tell('Waiting for the bench. Your request ID is saved; use it to resume.');return queued;}
+  async function refresh(){await snapshot();if(state.relay?.connected){await settle(await call('get_fm1_status'));await settle(await call('list_fm1_apps'));}return state;}
+  async function plan(id){if(typeof id!=='string')throw new Error('Choose a connected package.');return settle(await call('plan_fm1_app',{catalog_id:id}));}
+  async function stage(id,entry_method){const data=await call('prepare_fm1_switch',{catalog_id:id,entry_method});activeReview=data.review;el('review').innerHTML='<strong>'+esc(activeReview.title)+'</strong><p>'+esc(activeReview.variant)+'</p><p class="digest">SHA256 '+esc(activeReview.sha256)+'</p><p>Entry method: '+esc(activeReview.entry_method)+'</p>';el('approval').showModal();return data;}
+  async function action(fn){tell('');try{return await fn();}catch(error){tell(error.message||'The request could not be completed.');throw error;}}
+  function clickAction(fn){void action(fn).catch(()=>{});}
+  el('refresh').onclick=()=>clickAction(refresh);el('inspect').onclick=()=>clickAction(async()=>settle(await callJob()));
+  async function callJob(){const job_id=el('job-id').value.trim();if(!/^[a-f0-9]{32}$/.test(job_id))throw new Error('Use a 32-character lowercase saved job ID.');return call('get_fm1_job',{job_id});}
+  el('cancel').onclick=()=>{activeApproval=null;activeReview=null;el('approval').close();};
+  el('approval').addEventListener('cancel',()=>{activeApproval=null;activeReview=null;});
+  el('confirm').onclick=event=>{if(!event.isTrusted||!activeApproval)return;const approval_id=activeApproval;activeApproval=null;el('approval').close();clickAction(async()=>settle(await call('confirm_fm1_switch',{approval_id})));};
+  async function registerSiteTools(){
+    if(embedded)return;
+    const context=document.modelContext;
+    if(typeof context?.registerTool!=='function')return;
+    const object=(properties={})=>({type:'object',properties,required:Object.keys(properties),additionalProperties:false});
+    const definitions=[
+      ['view_fm1_library','Read the visible private library and saved bench connection.',object(),true,async()=>{await snapshot();return state;}],
+      ['refresh_fm1_library','Refresh inventory and package metadata without device I/O.',object(),true,refresh],
+      ['plan_fm1_app','Create an offline plan and show its saved progress. No device I/O.',object({catalog_id:{type:'string',pattern:'^[a-z0-9][a-z0-9_-]{0,63}$'}}),false,input=>plan(input.catalog_id)],
+      ['inspect_fm1_request','Resume the exact saved relay request and show its outcome.',object({request_id:{type:'string',pattern:'^[a-f0-9]{32}$'}}),true,input=>inspectRequest(input.request_id)],
+      ['inspect_fm1_job','Inspect the original bridge job ID; never resubmits.',object({job_id:{type:'string',pattern:'^[a-f0-9]{32}$'}}),true,async input=>settle(await call('get_fm1_job',input))],
+      ['start_fm1_switch_review','Open human confirmation for a selected package. Does not submit a device write.',object({catalog_id:{type:'string',pattern:'^[a-z0-9][a-z0-9_-]{0,63}$'},entry_method:{type:'string',enum:['serial','already_uboot']}}),false,input=>stage(input.catalog_id,input.entry_method)],
+    ];
+    for(const [name,description,inputSchema,readOnlyHint,execute] of definitions){
+      try{await context.registerTool({name,description,inputSchema,annotations:{readOnlyHint,untrustedContentHint:true},execute:async input=>{
+        if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(key=>!Object.hasOwn(inputSchema.properties,key))||inputSchema.required.some(key=>!Object.hasOwn(input,key)))throw new Error('Unexpected or missing arguments.');
+        for(const [key,schema] of Object.entries(inputSchema.properties)){if(typeof input[key]!=='string'||(schema.pattern&&!new RegExp(schema.pattern).test(input[key]))||(schema.enum&&!schema.enum.includes(input[key])))throw new Error('Invalid '+key+'.');}
+        return action(()=>execute(input));
+      }},{signal:lifecycle.signal});}catch{tell('Site tools could not be registered. The library controls remain available.');}
+    }
+  }
+  function dispose(){disposed=true;activeApproval=null;activeReview=null;lifecycle.abort();for(const item of pending.values()){clearTimeout(item.timer);item.reject(new Error('Panel closed.'));}pending.clear();}
+  window.addEventListener('pagehide',dispose,{once:true});
+  render();
+  async function start(){
+    if(embedded){const response=await hostRequest('ui/initialize',{appInfo:{name:'FM1 App Library',version:'1.0.0'},appCapabilities:{availableDisplayModes:['inline','fullscreen']},protocolVersion:'2026-01-26'});hostCapabilities=response.hostCapabilities||{};hostReady=true;window.parent.postMessage({jsonrpc:'2.0',method:'ui/notifications/initialized',params:{}},'*');await new Promise(resolve=>setTimeout(resolve,1000));if(!initialPayload&&hostCapabilities.serverTools)await snapshot();}
+    else{try{await snapshot();}finally{await registerSiteTools();}}
+  }
+  clickAction(start);
+})();
+</script></body></html>`;

@@ -322,6 +322,55 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(len(self.backend.calls), 1)
         self.assertFalse(self.manager.status()['engine']['blocked_unknown'])
 
+    def test_offline_backend_exceptions_fail_without_blocking_device_jobs(self):
+        requests = (job('plan_app', catalog_id='nes-test'), job('environment'),
+                    job('plan', request=prepared()))
+        for body in requests:
+            with self.subTest(operation=body['operation']):
+                self.backend.failure = TimeoutError('Private offline diagnostic: ' + TOKEN)
+                calls_before = len(self.backend.calls)
+                self.submit(body)
+                completed = self.wait_job(body['id'])
+                self.assertEqual(completed['status'], 'failed')
+                self.assertIsNone(completed['result'])
+                self.assertIn('TimeoutError', completed['error'])
+                self.assertNotIn(TOKEN, json.dumps(completed))
+                self.assertFalse(self.manager.status()['engine']['blocked_unknown'])
+                self.assertEqual(self.submit(body), completed)
+                self.assertEqual(len(self.backend.calls), calls_before + 1)
+                self.backend.failure = None
+                device_job = job('reset')
+                self.submit(device_job)
+                self.assertEqual(self.wait_job(device_job['id'])['status'], 'succeeded')
+                self.assertEqual(len(self.backend.calls), calls_before + 2)
+
+    def test_failed_offline_jobs_survive_restart_without_device_uncertainty(self):
+        requests = (job('plan_app', catalog_id='nes-test'), job('environment'))
+        self.backend.failure = TimeoutError('Offline planner unavailable')
+        for body in requests:
+            self.submit(body)
+            self.assertEqual(self.wait_job(body['id'])['status'], 'failed')
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=5)
+        self.manager.close()
+        self.manager = bridge.JobManager(self.backend, self.root)
+        self.server = bridge.make_server(self.manager, TOKEN, port=0)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        self.port = self.server.server_address[1]
+        self.assertFalse(self.manager.status()['engine']['blocked_unknown'])
+        for body in requests:
+            saved = self.manager.get_job(body['id'])
+            self.assertEqual(saved['status'], 'failed')
+            self.assertEqual(self.submit(body), saved)
+        self.assertEqual(len(self.backend.calls), len(requests))
+        self.backend.failure = None
+        device_job = job('reset')
+        self.submit(device_job)
+        self.assertEqual(self.wait_job(device_job['id'])['status'], 'succeeded')
+        self.assertEqual(len(self.backend.calls), len(requests) + 1)
+
     def test_unknown_backend_outcome_latches_device_operations(self):
         self.backend.failure = TimeoutError('Pipe outcome unavailable')
         body = job('reset')
