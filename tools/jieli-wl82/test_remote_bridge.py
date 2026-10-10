@@ -18,6 +18,7 @@ import remote_bridge as bridge
 
 SIZE = 0x100000
 TOKEN = 'offline-test-token-' + 'a' * 48
+UPDATER_SHA256 = '1a' * 32
 BASELINE = bytes(SIZE)
 CANDIDATE = bytearray(BASELINE)
 CANDIDATE[0x4000] = 1
@@ -54,9 +55,12 @@ class FakeBackend:
     def status(self):
         return {'device_io': False, 'session_configured': True}
 
-    def execute(self, operation, request=None, loader_state=None, catalog_id=None, entry_method=None):
+    def execute(self, operation, request=None, loader_state=None, catalog_id=None, entry_method=None,
+                expected_sha256=None):
         if operation in ('switch_app', 'plan_app'):
             self.calls.append((operation, catalog_id, entry_method))
+        elif operation == 'official_updater':
+            self.calls.append((operation, expected_sha256, None))
         else:
             self.calls.append((operation, request, loader_state))
         self.entered.set()
@@ -390,6 +394,8 @@ class BridgeTests(unittest.TestCase):
                 fields['loader_state'] = 'reuse'
             if operation == 'switch_app':
                 fields.update(catalog_id='nes-test', entry_method='serial')
+            if operation == 'official_updater':
+                fields['expected_sha256'] = UPDATER_SHA256
             status, headers, raw = self.request('POST', '/v1/jobs', job(operation, **fields))
             self.assertEqual(status, 409, raw)
 
@@ -569,18 +575,20 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(self.backend.catalog_installs, [])
         self.assertEqual(self.backend.calls, [])
 
-    def test_switch_app_accepts_only_catalog_slug_and_explicit_entry_method(self):
-        body = job('switch_app', catalog_id='nes-test', entry_method='serial')
-        self.submit(body)
-        self.assertEqual(self.wait_job(body['id'])['status'], 'succeeded')
-        self.assertEqual(self.backend.calls, [('switch_app', 'nes-test', 'serial')])
+    def test_switch_app_accepts_only_catalog_slug_and_known_entry_method(self):
+        for method in ('auto', 'serial', 'already_uboot'):
+            body = job('switch_app', catalog_id='nes-test', entry_method=method)
+            self.submit(body)
+            self.assertEqual(self.wait_job(body['id'])['status'], 'succeeded')
+        self.assertEqual(self.backend.calls, [('switch_app', 'nes-test', method)
+                                             for method in ('auto', 'serial', 'already_uboot')])
         for fields in ({'catalog_id': '../escape', 'entry_method': 'serial'},
                        {'catalog_id': 'nes-test', 'entry_method': 'guess'},
                        {'catalog_id': 'nes-test'},
                        {'catalog_id': 'nes-test', 'entry_method': 'serial', 'path': 'candidate.bin'}):
             status, headers, raw = self.request('POST', '/v1/jobs', job('switch_app', **fields))
             self.assertEqual(status, 400, raw)
-        self.assertEqual(len(self.backend.calls), 1)
+        self.assertEqual(len(self.backend.calls), 3)
 
     def test_plan_app_accepts_only_a_catalog_slug_without_entry_or_write_parameters(self):
         body = job('plan_app', catalog_id='nes-test')
@@ -594,10 +602,28 @@ class BridgeTests(unittest.TestCase):
             self.assertEqual(status, 400, raw)
         self.assertEqual(len(self.backend.calls), 1)
 
-    def test_successful_official_updater_handoff_persistently_blocks_device_operations(self):
-        body = job('official_updater')
+    def test_official_updater_requires_only_a_reviewed_lowercase_hash(self):
+        invalid = [{}] + [{'expected_sha256': value}
+                          for value in (None, 123, [], {}, '', 'a' * 63, 'a' * 65,
+                                        'A' * 64, 'g' * 64)]
+        invalid += [{'expected_sha256': UPDATER_SHA256, name: value}
+                    for name, value in (('path', 'other.exe'), ('args', ['--write']),
+                                        ('url', 'https://other.example'), ('request', prepared()),
+                                        ('entry_method', 'auto'), ('catalog_id', 'nes-test'))]
+        for fields in invalid:
+            with self.subTest(fields=fields):
+                status, headers, raw = self.request('POST', '/v1/jobs', job('official_updater', **fields))
+                self.assertEqual(status, 400, raw)
+        self.assertEqual(self.backend.calls, [])
+        self.assertEqual(list((self.root / 'jobs').iterdir()), [])
+
+    def test_successful_official_updater_handoff_replays_and_persistently_blocks_device_operations(self):
+        body = job('official_updater', expected_sha256=UPDATER_SHA256)
         self.submit(body)
-        self.assertEqual(self.wait_job(body['id'])['status'], 'succeeded')
+        completed = self.wait_job(body['id'])
+        self.assertEqual(completed['status'], 'succeeded')
+        self.assertEqual(self.submit(body), completed)
+        self.assertEqual(self.backend.calls, [('official_updater', UPDATER_SHA256, None)])
         engine = self.manager.status()['engine']
         self.assertTrue(engine['updater_handoff'])
         self.assertTrue(engine['blocked_unknown'])
@@ -606,7 +632,33 @@ class BridgeTests(unittest.TestCase):
         self.manager = bridge.JobManager(self.backend, self.root)
         self.assertTrue(self.manager.status()['engine']['updater_handoff'])
         self.assertTrue(self.manager.status()['engine']['blocked_unknown'])
+        self.assertEqual(self.manager.submit(body), completed)
+        with self.assertRaises(bridge.BridgeError) as changed:
+            self.manager.submit(dict(body, expected_sha256='b' * 64))
+        self.assertEqual(changed.exception.status, 409)
+        with self.assertRaises(bridge.BridgeError) as another:
+            self.manager.submit(job('official_updater', expected_sha256=UPDATER_SHA256))
+        self.assertEqual(another.exception.status, 409)
         self.assertEqual(len(self.backend.calls), 1)
+
+    def test_uncertain_official_handoff_replays_unknown_without_another_gui_launch(self):
+        self.backend.failure = TimeoutError('No terminal handoff reply')
+        body = job('official_updater', expected_sha256=UPDATER_SHA256)
+        self.submit(body)
+        completed = self.wait_job(body['id'])
+        self.assertEqual(completed['status'], 'unknown')
+        self.backend.failure = None
+        self.assertEqual(self.submit(body), completed)
+        self.assert_unknown_blocks_device_jobs()
+        self.manager.close()
+        self.manager = bridge.JobManager(self.backend, self.root)
+        self.assertEqual(self.manager.submit(body), completed)
+        self.assertTrue(self.manager.status()['engine']['blocked_unknown'])
+        self.assertFalse(self.manager.status()['engine']['updater_handoff'])
+        with self.assertRaises(bridge.BridgeError) as another:
+            self.manager.submit(job('official_updater', expected_sha256=UPDATER_SHA256))
+        self.assertEqual(another.exception.status, 409)
+        self.assertEqual(self.backend.calls, [('official_updater', UPDATER_SHA256, None)])
 
     def test_unknown_backend_exception_does_not_echo_private_error_text(self):
         self.backend.failure = RuntimeError(TOKEN + ' private-path-and-request-data')

@@ -21,7 +21,11 @@ the relay restart also passed in that native panel. No Chrome
 extension is required for this native plugin experience. The website can be
 opened independently of plugin installation.
 
-## Current bench state
+## Recorded metadata bench state (2026-10-09)
+
+The following is the recorded metadata acceptance check. Use **Refresh** for
+the current session, update mode and enable flags; later setup does not turn
+these earlier observations into hardware acceptance.
 
 Browse the five app cards: **NES, Doom, MDX, Buddha, and ProTracker**. The
 verified local relay is connected with switching **Disabled**. It reports six
@@ -76,6 +80,38 @@ review; they do not expose a confirmation tool. The panel saves the original
 job ID before submitting confirmation. If the confirmation reply is lost,
 use **Inspect job** with that ID before reviewing another switch; do not
 submit the operation again.
+
+## Choose the update route
+
+The **Auto** entry method chooses the protected app route from fresh passive
+inventory: one recognized CDC interface uses the existing serial entry flow;
+one UBOOT disk uses the already-in-UBOOT flow. An inventory error, duplicate
+devices, conflicting modes or a changed mode prevents submission. The approved
+catalog ID and package SHA-256 still identify the custom app to install.
+Auto does not convert an app bundle into an official firmware package.
+
+For official firmware, open its review and confirm the displayed executable
+SHA-256 yourself. The bench must separately enable official-update
+handoff and expose one recognized stock or OTA MIDI input/output pair. The
+confirmed action opens the locally configured M-UPGRADE GUI; select the correct
+official `.fwsc` there and complete the manufacturer workflow locally. The
+[manufacturer download page](https://www.m-vave.com/download) lists the generic
+[M-UPGRADE package](https://yms-file-store.oss-cn-hongkong.aliyuncs.com/software/pc/M-UPGRADE.zip)
+and [FM-1 V15 firmware](https://yms-file-store.oss-cn-hongkong.aliyuncs.com/software/firmware/FM-1.fwsc).
+The older FM1-specific bundle embeds V14, so use the reviewed generic updater
+for the external V15 package.
+
+A saved successful handoff means the GUI started. It does not establish a
+firmware transfer or verification. Keep its original job ID if any reply is
+lost. Handoff persistently blocks further device jobs because the old baseline
+may no longer describe the FM1. After official completion, the bench owner must
+establish a fresh protected session and verified current-unit baseline while
+preserving the previous state and receipts. There is no remote unblock or
+automatic retry. Direct SysEx writing is not implemented by this integration.
+
+Automatic mode selection and vendor handoff have offline contract coverage.
+Their physical acceptance must be recorded separately for the connected unit;
+the earlier metadata check does not establish it.
 
 ## Read progress correctly
 

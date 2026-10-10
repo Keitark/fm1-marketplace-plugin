@@ -1,5 +1,33 @@
 # Integration verification
 
+## Current update, 2026-10-10
+
+- 189 Python tests passed in 36.368 seconds; these include 62 relay tests,
+  passive mode detection, route/identity revalidation, pinned updater handoff,
+  and durable recovery with the original job ID.
+- 10 store JavaScript tests and 69 Site tests passed (40 server, 25 UI, 4 SDK).
+  The Site tests include native confirmation, engine latches, official approval
+  digest/expiry/atomicity, automatic routes and v1/v2/v3 resource aliases.
+- All three integration PowerShell launchers/clients parse. Typechecking and
+  the production build passed with the pinned SDKs.
+- Site v4 source `bd87d14a039b8ef5233a6b3c60291c3642ee7f98` was packaged by
+  the source workflow and privately deployed as
+  `appgdep_6ac9903cd9e08191b5df920575373d1e`; deployment succeeded with MCP enabled.
+  The installed plugin's library read succeeded after deployment.
+- The separately prepared protected helper passed its live frozen-runtime
+  parent/child proof. Serial identified MDX Karaoke; a guarded UBOOT transition
+  and two identical complete 1 MiB readbacks completed. No flash-array program
+  or erase command was sent. The readback matches the MDX RayForce catalog image
+  and differs from the historical seed baseline. The source protected receipt
+  and both images are preserved; baseline migration and session attachment are
+  recorded below when verified.
+- Generic M-UPGRADE was downloaded from the manufacturer; its executable hash
+  and external `.fwsc` chooser were checked statically with its full Qt closure.
+  The official MIDI/SysEx transfer and physical write/startup acceptance remain
+  untested on this device. GUI handoff is never treated as verified programming.
+
+## Historical release, 2026-10-09
+
 The checks below were recorded on 2026-10-09 using Python 3.11.0 and
 Node.js v22.22.2 on Windows. Current Site version 3, the final offline suite,
 and actual native-panel acceptance are recorded below. Earlier import and

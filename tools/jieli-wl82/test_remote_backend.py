@@ -26,6 +26,24 @@ def prepared():
                 sha256=sha(BASELINE), baseline_sha256=sha(BASELINE))
 
 
+def inventory(mode='serial', identity='one'):
+    """Synthetic passive interface metadata; no transport or OS queries."""
+    serial = [{'port': 'COM_' + identity, 'vid': 0x3654, 'pid': 0x5155,
+               'serial_number': 'fixture-' + identity}] if mode == 'serial' else []
+    disks = [{'DeviceID': 'disk-' + identity, 'PNPDeviceID': 'fixture-' + identity,
+              'Model': 'WL82 UBOOT1.00 USB Device'}] if mode == 'uboot' else []
+    midi = []
+    if mode in ('sysex', 'ota_sysex'):
+        name = 'FM-1' if mode == 'sysex' else 'ota-FM-1'
+        midi = [{'direction': direction, 'name': name} for direction in ('in', 'out')]
+    if mode == 'ambiguous':
+        serial = [{'port': 'COM_one'}, {'port': 'COM_two'}]
+    error = 'Synthetic inventory failed' if mode == 'unknown' else None
+    return {'serial_ports': serial, 'uboot_disks': disks, 'midi_endpoints': midi,
+            'inventory_error': error,
+            'update_mode': backend.classify_update_mode(serial, disks, midi, error)}
+
+
 class BackendTests(unittest.TestCase):
     def setUp(self):
         self.folder = tempfile.TemporaryDirectory()
@@ -56,6 +74,13 @@ class BackendTests(unittest.TestCase):
         path.write_bytes(data)
         return {'ok': True, 'data': {'result': {
             'size': SIZE, 'readback_count': 2, 'file': relative, 'sha256': sha(data)}}}
+
+    def official_adapter(self):
+        updater = self.root / 'M-UPGRADE-FM1.exe'
+        updater.write_bytes(b'Offline fake executable; never launched')
+        expected = sha(updater.read_bytes())
+        return updater, expected, backend.WindowsBackend(self.repo, self.session,
+            official_updater=updater, official_updater_sha256=expected)
 
     def bundle(self, image=None):
         if image is None:
@@ -225,6 +250,7 @@ class BackendTests(unittest.TestCase):
                             description='Other', serial_number='other')])
         modules = {'serial.tools': SimpleNamespace(list_ports=ports)}
         with patch.dict('sys.modules', modules), patch.object(backend.sys, 'platform', 'win32'), \
+             patch.object(backend, 'enumerate_midi_endpoints', return_value={'endpoints': [], 'error': None}), \
              patch.object(backend.subprocess, 'run',
                           return_value=SimpleNamespace(stdout='[]', returncode=0)) as call:
             result = self.adapter.status()
@@ -237,6 +263,8 @@ class BackendTests(unittest.TestCase):
         self.assertIn('Get-CimInstance Win32_DiskDrive', args[-1])
         self.assertNotIn('-File', args)
         self.assertNotIn('-Operation', args)
+        self.assertEqual(result['update_mode']['app_entry_method'], 'serial')
+        self.assertFalse(result['update_mode']['official_available'])
 
     def test_catalog_package_ids_are_immutable(self):
         bundle = self.bundle()
@@ -397,6 +425,57 @@ class BackendTests(unittest.TestCase):
         self.assertTrue(result['data']['already_current'])
         self.assertFalse(result['data']['device_io'])
 
+    def test_auto_selects_one_serial_or_uboot_route_and_rechecks_before_device_steps(self):
+        self.adapter.install_catalog(self.bundle())
+        for mode in ('serial', 'uboot'):
+            calls = []
+            def pipe(operation, request=None):
+                calls.append(operation)
+                return {'ok': True, 'data': {'result': {'profile': 'NES'}}}
+            with self.subTest(mode=mode), patch.object(self.adapter, '_pipe', side_effect=pipe), \
+                 patch.object(self.adapter, 'status', side_effect=[inventory(mode), inventory(mode)]) as status:
+                result = self.adapter.execute('switch_app', catalog_id='nes-test', entry_method='auto')
+            self.assertTrue(result['ok'], result)
+            self.assertEqual(status.call_count, 2)
+            expected = ['plan'] + (['enter_uboot'] if mode == 'serial' else [])
+            self.assertEqual(calls, expected + ['flash', 'reset', 'observe', 'serial_status'])
+
+    def test_auto_refuses_unknown_ambiguous_disconnected_or_official_midi_before_planning(self):
+        self.adapter.install_catalog(self.bundle())
+        for mode in ('unknown', 'ambiguous', 'disconnected', 'sysex', 'ota_sysex'):
+            with self.subTest(mode=mode), \
+                 patch.object(self.adapter, '_pipe', side_effect=AssertionError('No protected operation')), \
+                 patch.object(self.adapter, 'status', return_value=inventory(mode)):
+                result = self.adapter.execute('switch_app', catalog_id='nes-test', entry_method='auto')
+            self.assertFalse(result['ok'])
+            self.assertIn('Automatic app switching requires one serial or UBOOT', result['error'])
+
+    def test_auto_mode_or_identity_change_after_plan_stops_before_device_steps(self):
+        self.adapter.install_catalog(self.bundle())
+        changes = [('serial', inventory('uboot')), ('uboot', inventory('serial')),
+                   ('serial', inventory('unknown')), ('uboot', inventory('ambiguous')),
+                   ('serial', inventory('serial', 'replacement')),
+                   ('uboot', inventory('uboot', 'replacement'))]
+        for first_mode, second in changes:
+            with self.subTest(first=first_mode, second=second['update_mode']['mode']), \
+                 patch.object(self.adapter, '_pipe', return_value={'ok': True}) as pipe, \
+                 patch.object(self.adapter, 'status', side_effect=[inventory(first_mode), second]):
+                result = self.adapter.execute('switch_app', catalog_id='nes-test', entry_method='auto')
+            self.assertFalse(result['ok'])
+            self.assertIn('Device update mode changed during offline planning', result['error'])
+            self.assertEqual([call.args[0] for call in pipe.call_args_list], ['plan'])
+
+    def test_auto_session_guards_precede_inventory_and_offline_plan(self):
+        clean = json.loads((self.session / 'state.json').read_text(encoding='utf-8'))
+        for changes in ({'blocked': True}, {'reset_pending': True}, {'needs_observation': True},
+                        {'operation': 'flash'}, {'loader_running': True}):
+            self.write_state(dict(clean, **changes))
+            with self.subTest(changes=changes), \
+                 patch.object(self.adapter, '_pipe', side_effect=AssertionError('No protected operation')), \
+                 patch.object(self.adapter, 'status', side_effect=AssertionError('No inventory needed')):
+                result = self.adapter.execute('switch_app', catalog_id='nes-test', entry_method='auto')
+            self.assertFalse(result['ok'])
+
     def test_official_updater_requires_locally_configured_executable_and_hash(self):
         updater = self.root / 'M-UPGRADE-FM1.exe'
         updater.write_bytes(b'Offline fake executable; never launched')
@@ -405,35 +484,123 @@ class BackendTests(unittest.TestCase):
         with patch.object(backend.sys, 'platform', 'win32'), \
              patch.object(backend.subprocess, 'Popen', side_effect=AssertionError('No execution')):
             self.assertFalse(self.adapter.execute('official_updater')['ok'])
-            self.assertFalse(adapter.execute('official_updater')['ok'])
+            self.assertFalse(adapter.execute('official_updater', expected_sha256='0' * 64)['ok'])
             with self.assertRaises(ValueError):
                 adapter.execute('official_updater', request=prepared())
 
     def test_official_updater_handoff_launches_only_verified_local_executable(self):
-        updater = self.root / 'M-UPGRADE-FM1.exe'
-        updater.write_bytes(b'Offline fake executable; never launched')
-        adapter = backend.WindowsBackend(self.repo, self.session,
-                    official_updater=updater, official_updater_sha256=sha(updater.read_bytes()))
-        with patch.object(backend.sys, 'platform', 'win32'), \
-             patch.object(backend.subprocess, 'Popen', return_value=SimpleNamespace(pid=1234)) as launch:
-            result = adapter.execute('official_updater')
-        self.assertTrue(result['ok'], result)
-        self.assertTrue(result['data']['handoff'])
-        self.assertFalse(result['data']['written_verified'])
-        launch.assert_called_once_with([str(updater)], cwd=updater.parent)
+        updater, expected, adapter = self.official_adapter()
+        for mode in ('sysex', 'ota_sysex'):
+            with self.subTest(mode=mode), patch.object(backend.sys, 'platform', 'win32'), \
+                 patch.object(adapter, 'status', return_value=inventory(mode)) as status, \
+                 patch.object(adapter, '_pipe', side_effect=AssertionError('No protected device operation')), \
+                 patch.object(backend.subprocess, 'Popen', return_value=SimpleNamespace(pid=1234)) as launch:
+                result = adapter.execute('official_updater', expected_sha256=expected)
+            self.assertTrue(result['ok'], result)
+            self.assertTrue(result['data']['handoff'])
+            self.assertFalse(result['data']['written_verified'])
+            self.assertEqual(result['data']['sha256'], expected)
+            self.assertEqual(result['data']['mode'], mode)
+            self.assertEqual(status.call_count, 1)
+            launch.assert_called_once_with([str(updater)], cwd=updater.parent)
+            self.assertNotIn(str(updater), json.dumps(result))
 
     def test_official_updater_refuses_latched_or_unobserved_protected_session(self):
-        updater = self.root / 'M-UPGRADE-FM1.exe'
-        updater.write_bytes(b'Offline fake executable; never launched')
-        adapter = backend.WindowsBackend(self.repo, self.session,
-                    official_updater=updater, official_updater_sha256=sha(updater.read_bytes()))
+        updater, expected, adapter = self.official_adapter()
         clean = json.loads((self.session / 'state.json').read_text(encoding='utf-8'))
         for changes in ({'blocked': True}, {'reset_pending': True}, {'needs_observation': True},
-                        {'operation': 'flash'}):
+                        {'operation': 'flash'}, {'loader_running': True}):
             self.write_state(dict(clean, **changes))
             with self.subTest(changes=changes), patch.object(backend.sys, 'platform', 'win32'), \
+                 patch.object(adapter, 'status', side_effect=AssertionError('Guard precedes inventory')), \
                  patch.object(backend.subprocess, 'Popen', side_effect=AssertionError('No updater launch')):
-                self.assertFalse(adapter.execute('official_updater')['ok'])
+                result = adapter.execute('official_updater', expected_sha256=expected)
+                self.assertFalse(result['ok'])
+                self.assertIn('Resolve protected session', result['error'])
+
+    def test_official_updater_refuses_stopped_session_before_inventory_or_launch(self):
+        _, expected, adapter = self.official_adapter()
+        (self.session / 'stopped.txt').write_text('Offline stopped fixture', encoding='utf-8')
+        with patch.object(backend.sys, 'platform', 'win32'), \
+             patch.object(adapter, 'status', side_effect=AssertionError('No inventory')), \
+             patch.object(backend.subprocess, 'Popen', side_effect=AssertionError('No updater launch')):
+            result = adapter.execute('official_updater', expected_sha256=expected)
+        self.assertFalse(result['ok'])
+        self.assertIn('Resolve protected session', result['error'])
+
+    def test_official_reviewed_hash_is_exact_and_matches_current_local_executable(self):
+        updater, expected, adapter = self.official_adapter()
+        for digest in (None, True, 'invalid', expected.upper(), expected[:-1], '0' * 64):
+            with self.subTest(digest=digest), patch.object(backend.sys, 'platform', 'win32'), \
+                 patch.object(adapter, 'status', side_effect=AssertionError('Hash guard precedes inventory')), \
+                 patch.object(backend.subprocess, 'Popen', side_effect=AssertionError('No updater launch')):
+                result = adapter.execute('official_updater', expected_sha256=digest)
+            self.assertFalse(result['ok'])
+            self.assertIn('SHA256', result['error'])
+        updater.write_bytes(b'Changed after approval')
+        with patch.object(backend.sys, 'platform', 'win32'), \
+             patch.object(adapter, 'status', side_effect=AssertionError('Hash guard precedes inventory')), \
+             patch.object(backend.subprocess, 'Popen', side_effect=AssertionError('No updater launch')):
+            result = adapter.execute('official_updater', expected_sha256=expected)
+        self.assertFalse(result['ok'])
+        self.assertIn('executable hash changed', result['error'])
+
+    def test_official_updater_refuses_non_midi_ambiguous_or_failed_inventory(self):
+        _, expected, adapter = self.official_adapter()
+        for mode in ('serial', 'uboot', 'disconnected', 'ambiguous', 'unknown'):
+            with self.subTest(mode=mode), patch.object(backend.sys, 'platform', 'win32'), \
+                 patch.object(adapter, 'status', return_value=inventory(mode)), \
+                 patch.object(backend.subprocess, 'Popen', side_effect=AssertionError('No updater launch')):
+                result = adapter.execute('official_updater', expected_sha256=expected)
+            self.assertFalse(result['ok'])
+            self.assertIn('freshly recognized stock or OTA MIDI input/output pair', result['error'])
+
+    def test_updater_hash_parameter_cannot_be_used_to_override_another_operation(self):
+        with patch.object(self.adapter, '_pipe', side_effect=AssertionError('No protected operation')):
+            for operation in ('observe', 'plan_app', 'switch_app'):
+                with self.subTest(operation=operation), self.assertRaises(ValueError):
+                    self.adapter.execute(operation, expected_sha256='d' * 64)
+
+    def test_official_handoff_rechecks_session_changes_during_passive_inventory(self):
+        _, expected, adapter = self.official_adapter()
+        clean = json.loads((self.session / 'state.json').read_text(encoding='utf-8'))
+        for changes in ({'blocked': True}, {'reset_pending': True}, {'needs_observation': True},
+                        {'operation': 'flash'}, {'loader_running': True}, {'stopped': True}):
+            self.write_state(clean)
+            def changed_inventory(changes=changes):
+                fresh = dict(clean, **changes)
+                self.write_state(fresh)
+                return dict(inventory('sysex'), session=fresh)
+            with self.subTest(changes=changes), patch.object(backend.sys, 'platform', 'win32'), \
+                 patch.object(adapter, 'status', side_effect=changed_inventory), \
+                 patch.object(backend.subprocess, 'Popen', side_effect=AssertionError('No updater launch')):
+                result = adapter.execute('official_updater', expected_sha256=expected)
+            self.assertFalse(result['ok'])
+            self.assertIn('Resolve protected session', result['error'])
+
+    def test_official_status_metadata_requires_current_hash_and_idle_session_without_paths(self):
+        updater, expected, adapter = self.official_adapter()
+        clean = json.loads((self.session / 'state.json').read_text(encoding='utf-8'))
+        modules = {'serial.tools': SimpleNamespace(list_ports=SimpleNamespace(comports=lambda: []))}
+        midi = {'endpoints': inventory('sysex')['midi_endpoints'], 'error': None}
+        for changes, available in (({}, True), ({'blocked': True}, False),
+                                   ({'loader_running': True}, False), ({'operation': 'flash'}, False),
+                                   ({'needs_observation': True}, False), ({'reset_pending': True}, False)):
+            self.write_state(dict(clean, **changes))
+            with self.subTest(changes=changes), patch.dict('sys.modules', modules), \
+                 patch.object(backend.sys, 'platform', 'win32'), \
+                 patch.object(backend, 'enumerate_midi_endpoints', return_value=midi), \
+                 patch.object(backend.subprocess, 'run', return_value=SimpleNamespace(stdout='[]', returncode=0)), \
+                 patch.object(backend.subprocess, 'Popen', side_effect=AssertionError('Metadata cannot launch')):
+                metadata = adapter.status()['official_update']
+            self.assertEqual(metadata, {'configured': True, 'sha256': expected,
+                'available': available, 'package_format': '.fwsc', 'handoff': True})
+            self.assertNotIn(str(updater), json.dumps(metadata))
+        updater.write_bytes(b'Executable changed')
+        with patch.object(backend.sys, 'platform', 'win32'):
+            metadata = adapter.official_update_metadata(inventory('sysex')['update_mode'])
+        self.assertTrue(metadata['configured'])
+        self.assertFalse(metadata['available'])
 
 
 if __name__ == '__main__':

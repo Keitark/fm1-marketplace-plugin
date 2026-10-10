@@ -11,7 +11,7 @@ passed in this updated panel, verifying the deployed MCP Apps SDK host bridge.
 The full website's WebMCP tools are an additional interface; native plugin use
 requires no Chrome extension.
 
-The top-level FM1 Site registers six tools through
+The top-level FM1 Site registers seven tools through
 `document.modelContext.registerTool` when the in-app browser supports WebMCP.
 They share the visible library's actions and state. Unsupported browsers keep
 the ordinary controls. Registration uses an `AbortSignal` and is removed when
@@ -31,13 +31,16 @@ match `^[a-f0-9]{32}$`.
 | `plan_fm1_app` | `{catalog_id}` | Submit an offline plan and show its saved outcome. |
 | `inspect_fm1_request` | `{request_id}` | Read the original request's saved delivery and job outcome. |
 | `inspect_fm1_job` | `{job_id}` | Inspect the original bridge job and display its result; never resubmit it. |
-| `start_fm1_switch_review` | `{catalog_id,entry_method}` | Open human review; `entry_method` is `serial` or `already_uboot`. No device write is submitted. |
+| `start_fm1_switch_review` | `{catalog_id,entry_method}` | Open human review; `entry_method` is `auto`, `serial` or `already_uboot`. Automatic selection is rechecked locally before device operations. No device write is submitted. |
+| `start_fm1_official_update_review` | `{}` | Review the pinned official Windows SysEx updater. No updater launch or firmware transfer is submitted. |
 
 There is no WebMCP confirmation tool. Review returns package identity and
 SHA-256 but never the approval nonce. Cancel or Escape clears the displayed
 approval. Final confirmation requires a trusted click on the visible control,
 the server's owner-bound one-use approval, and deliberate local switching
-enablement. See [the relay contract](SITE_RELAY.md) for delivery, digest, expiry,
+enablement. Official updater review uses a separate local capability and binds
+the executable SHA-256. Its human confirmation opens the vendor tool; completion
+remains in that tool. See [the relay contract](SITE_RELAY.md) for delivery, digest, expiry,
 and uncertainty handling.
 
 ## Native panel and SDK migration
@@ -54,9 +57,12 @@ result can still render without that capability. The iframe acknowledges
 `ui/resource-teardown`, aborts its lifecycle, clears approval state, and rejects
 pending requests. Page closure performs the same cleanup.
 
-Site version **3** pins **ext-apps 2.0.3** and official server SDK **2.3.1**.
-The current 45 Site tests, typecheck, production build, and private deployment
-passed. Actual SDK Client 2.3.1 negotiated **2026-07-28** and legacy
+The Site pins **ext-apps 2.0.3** and official server SDK **2.3.1**.
+The current resource is `ui://fm1/device-panel-v4.html`; v1, v2 and v3 aliases
+serve the same current panel. The ten MCP tools include two app-only confirmation
+tools. See [VERIFICATION.md](VERIFICATION.md) for dated deployment evidence.
+The historical v3 release passed 45 Site tests, typecheck, production build and
+private deployment. Actual SDK Client 2.3.1 negotiated **2026-07-28** and legacy
 **2025-11-25** protocols in memory. The new native UI resource is
 `ui://fm1/device-panel-v3.html`. Tool descriptors advertise that URI; reads of
 `ui://fm1/app-library-v1.html` and `ui://fm1/device-panel-v2.html` return the same
@@ -135,7 +141,7 @@ installed dependencies. Do not use a deployed Site or real bridge credentials.
    node test/browser-fixture.mjs http://127.0.0.1:3000
    ```
 
-4. Open the local URL in an in-app browser that exposes WebMCP. Discover the six
+4. Open the local URL in an in-app browser that exposes WebMCP. Discover the seven
    tools, exercise the valid and malformed cases above, and read back the UI
    state. Use the synthetic `nes-test` package for planning/review and Cancel
    the review. Stop the fixture and local Worker afterward.

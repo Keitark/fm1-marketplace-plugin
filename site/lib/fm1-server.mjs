@@ -22,8 +22,8 @@ function db(env){if(!env.DB)throw new PublicError('Saved requests are unavailabl
 function user(request){const value=request.headers.get('oai-authenticated-user-id');if(!value)throw new PublicError('Sign in to use your FM1 library.',401);return value;}
 function safeOrigin(request,env){const origin=request.headers.get('origin');if(origin&&origin!==(env.SITE_ORIGIN||new URL(request.url).origin))throw new PublicError('Origin is not permitted.',403);}
 async function relayState(env) {
-  const row=await db(env).prepare("SELECT last_seen,allow_switch FROM relay_state WHERE id='bench'").first();
-  return {connected:!!row&&now()-row.last_seen<30,last_seen:row?.last_seen??null,allow_switch:!!row?.allow_switch};
+  const row=await db(env).prepare("SELECT last_seen,allow_switch,allow_official_update FROM relay_state WHERE id='bench'").first();
+  return {connected:!!row&&now()-row.last_seen<30,last_seen:row?.last_seen??null,allow_switch:!!row?.allow_switch,allow_official_update:!!row?.allow_official_update};
 }
 async function latest(env,owner,operation){const row=await db(env).prepare("SELECT result FROM relay_tasks WHERE user_id=? AND operation=? AND state='succeeded' ORDER BY created DESC,rowid DESC LIMIT 1").bind(owner,operation).first();return row?.result?JSON.parse(row.result).data:null;}
 async function library(env,owner){
@@ -34,10 +34,11 @@ async function enqueue(env,owner,operation,args,taskId=ident()){
   const connection=await relayState(env);
   if(!connection.connected)throw new PublicError('Bench connection is offline. Reconnect the relay before requesting fresh data.',503);
   if(operation==='switch_app'&&!connection.allow_switch)throw new PublicError('App switching is disabled at the bench.',403);
+  if(operation==='official_updater'&&!connection.allow_official_update)throw new PublicError('Official updating is disabled at the bench.',403);
   const existing=await db(env).prepare('SELECT * FROM relay_tasks WHERE id=? AND user_id=?').bind(taskId,owner).first();
   if(existing)return {request_id:existing.id,delivery:existing.state};
   await db(env).prepare('INSERT INTO relay_tasks(id,user_id,operation,arguments,state,created) VALUES(?,?,?,?,?,?)').bind(taskId,owner,operation,JSON.stringify(args),'pending',now()).run();
-  return {request_id:taskId,delivery:'pending',...(operation==='plan_app'||operation==='switch_app'?{job_id:taskId}:{}),message:'Saved request. Inspect this ID; do not submit another request after a timeout.'};
+  return {request_id:taskId,delivery:'pending',...(['plan_app','switch_app','official_updater'].includes(operation)?{job_id:taskId}:{}),message:'Saved request. Inspect this ID; do not submit another request after a timeout.'};
 }
 async function stagedSwitch(env,owner,args){
   const connection=await relayState(env);
@@ -45,9 +46,45 @@ async function stagedSwitch(env,owner,args){
   const catalog=await latest(env,owner,'catalog');
   const variant=catalog?.apps?.flatMap(app=>app.variants||[]).find(item=>item.id===args.catalog_id);
   if(!variant||!variant.ready||!/^[a-f0-9]{64}$/.test(variant.sha256))throw new PublicError('Refresh packages and choose a validated, ready variant.',409);
+  const inventory=await latest(env,owner,'status');
+  const mode=inventory?.device?.update_mode;
+  if(args.entry_method==='auto'&&!['serial','already_uboot'].includes(mode?.app_entry_method))throw new PublicError('Refresh the device: automatic app routing needs one recognized serial or UBOOT device.',409);
   const approval=ident();
   await db(env).prepare('INSERT INTO switch_approvals(id,user_id,catalog_id,digest,entry_method,expires,used) VALUES(?,?,?,?,?,?,0)').bind(approval,owner,args.catalog_id,variant.sha256,args.entry_method,now()+180).run();
-  return {review:{title:variant.title,variant:variant.variant,sha256:variant.sha256,catalog_id:variant.id,entry_method:args.entry_method,expires:now()+180},_approval:approval,message:'Review the variant in the library and click Confirm app switch. No device write has been submitted.'};
+  return {review:{title:variant.title,variant:variant.variant,sha256:variant.sha256,catalog_id:variant.id,entry_method:args.entry_method,...(args.entry_method==='auto'?{detected_method:mode.app_entry_method}:{}),expires:now()+180},_approval:approval,message:'Review the variant in the library and click Confirm app switch. No device write has been submitted.'};
+}
+async function officialState(env,owner){
+  const inventory=await latest(env,owner,'status');
+  const engine=inventory?.engine;
+  if(engine?.active||engine?.blocked_unknown||engine?.storage_fault||engine?.updater_handoff)throw new PublicError('Resolve the saved bench job or updater handoff before another official update.',409);
+  const update=inventory?.device?.official_update;
+  if(!update?.configured||!update.available||!/^[a-f0-9]{64}$/.test(update.sha256||''))throw new PublicError('Refresh the device: the pinned official updater needs a recognized FM1 MIDI/SysEx connection.',409);
+  return update;
+}
+async function stagedOfficial(env,owner){
+  const connection=await relayState(env);
+  if(!connection.connected||!connection.allow_official_update)throw new PublicError('Official updating is disabled or the bench is disconnected.',403);
+  const update=await officialState(env,owner),approval=ident(),expires=now()+180;
+  await db(env).prepare('INSERT INTO official_update_approvals(id,user_id,digest,expires,used) VALUES(?,?,?,?,0)').bind(approval,owner,update.sha256,expires).run();
+  return {review:{title:'Official FM1 SysEx update',sha256:update.sha256,package_format:'.fwsc',expires,handoff:true},_approval:approval,message:'Review and open the official Windows updater. Select the official .fwsc package there; the vendor tool handles the MIDI/OTA transfer. No updater has been launched.'};
+}
+async function commitOfficial(env,owner,args){
+  const approval=await db(env).prepare('SELECT * FROM official_update_approvals WHERE id=? AND user_id=?').bind(args.approval_id,owner).first();
+  if(!approval)throw new PublicError('This approval was not found. Review the official update again.',409);
+  if(approval.used){const saved=await db(env).prepare('SELECT id,state FROM relay_tasks WHERE id=? AND user_id=?').bind(approval.id,owner).first();if(saved)return {request_id:saved.id,job_id:saved.id,delivery:saved.state};throw new PublicError('Approval was consumed; inspect the saved request.',409);}
+  if(approval.expires<now())throw new PublicError('This approval has expired. Review the official update again.',409);
+  const connection=await relayState(env);
+  if(!connection.connected||!connection.allow_official_update)throw new PublicError('Official updating is disabled or the bench is disconnected.',403);
+  const update=await officialState(env,owner);
+  if(update.sha256!==approval.digest)throw new PublicError('The pinned updater changed. Refresh and review again.',409);
+  const committedAt=now();
+  await db(env).batch([
+    db(env).prepare('INSERT INTO relay_tasks(id,user_id,operation,arguments,state,created) SELECT id,user_id,?,?,?,? FROM official_update_approvals WHERE id=? AND user_id=? AND used=0 AND expires>=?').bind('official_updater',JSON.stringify({expected_sha256:approval.digest,approval_expires:approval.expires}),'pending',committedAt,approval.id,owner,committedAt),
+    db(env).prepare('UPDATE official_update_approvals SET used=1 WHERE id=? AND user_id=? AND used=0 AND expires>=?').bind(approval.id,owner,committedAt),
+  ]);
+  const saved=await db(env).prepare('SELECT id,state FROM relay_tasks WHERE id=? AND user_id=?').bind(approval.id,owner).first();
+  if(!saved)throw new PublicError('This approval has expired. Review again.',409);
+  return {request_id:saved.id,job_id:saved.id,delivery:saved.state,message:'Confirmed updater handoff saved. Inspect this ID; complete the update in the official Windows tool.'};
 }
 async function commitSwitch(env,owner,args){
   const approval=await db(env).prepare('SELECT * FROM switch_approvals WHERE id=? AND user_id=?').bind(args.approval_id,owner).first();
@@ -80,6 +117,8 @@ export async function callTool(env,owner,name,input){
   }
   if(name==='prepare_fm1_switch')return stagedSwitch(env,owner,args);
   if(name==='confirm_fm1_switch')return commitSwitch(env,owner,args);
+  if(name==='prepare_fm1_official_update')return stagedOfficial(env,owner);
+  if(name==='confirm_fm1_official_update')return commitOfficial(env,owner,args);
   return enqueue(env,owner,{get_fm1_status:'status',list_fm1_apps:'catalog',plan_fm1_app:'plan_app',get_fm1_job:'job'}[name],args);
 }
 async function relayRequest(request,env,path){
@@ -88,8 +127,8 @@ async function relayRequest(request,env,path){
   if(!configured||configured.length<32||request.headers.get('authorization')!=='Bearer '+configured)throw new PublicError('Relay authentication required.',401);
   const value=await body(request);
   if(path==='/relay/heartbeat'){
-    if(!value||Object.keys(value).some(key=>key!=='allow_switch')||typeof value.allow_switch!=='boolean')throw new PublicError('Invalid heartbeat.');
-    await db(env).prepare("INSERT INTO relay_state(id,last_seen,allow_switch) VALUES('bench',?,?) ON CONFLICT(id) DO UPDATE SET last_seen=excluded.last_seen,allow_switch=excluded.allow_switch").bind(now(),Number(value.allow_switch)).run();
+    if(!value||Object.keys(value).some(key=>!['allow_switch','allow_official_update'].includes(key))||typeof value.allow_switch!=='boolean'||(value.allow_official_update!==undefined&&typeof value.allow_official_update!=='boolean'))throw new PublicError('Invalid heartbeat.');
+    await db(env).prepare("INSERT INTO relay_state(id,last_seen,allow_switch,allow_official_update) VALUES('bench',?,?,?) ON CONFLICT(id) DO UPDATE SET last_seen=excluded.last_seen,allow_switch=excluded.allow_switch,allow_official_update=excluded.allow_official_update").bind(now(),Number(value.allow_switch),Number(value.allow_official_update===true)).run();
     return json({connected:true});
   }
   if(path==='/relay/poll'){
@@ -129,7 +168,7 @@ async function mcp(request,env){
     if(rpc?.method==='tools/call')user(request);
   }
   const handler=createMcpHandler(()=>{
-    const server=new McpServer({name:'FM1 App Library',version:'2.0.0',icons:ICONS},{
+    const server=new McpServer({name:'FM1 App Library',version:'2.1.0',icons:ICONS},{
       jsonSchemaValidator:new CfWorkerJsonSchemaValidator(),
       instructions:'Open the FM1 device panel through this installed plugin. Inspect saved request IDs after a disconnect. Offline planning does not authorize app switching. Switching requires human confirmation and enabled bench capability.',
     });
@@ -152,7 +191,7 @@ async function mcp(request,env){
     }
     // Older installed descriptors can still fetch the current panel at their
     // original URI. New descriptors exclusively advertise RESOURCE_URI.
-    for(const uri of [RESOURCE_URI,'ui://fm1/app-library-v1.html','ui://fm1/device-panel-v2.html']){
+    for(const uri of [RESOURCE_URI,'ui://fm1/app-library-v1.html','ui://fm1/device-panel-v2.html','ui://fm1/device-panel-v3.html']){
       registerAppResource(server,'FM1 device panel',uri,{},async()=>({contents:[{
         uri,mimeType:'text/html;profile=mcp-app',text:UI_HTML,
         _meta:{ui:{prefersBorder:true,csp:{connectDomains:[],resourceDomains:[]}},'openai/ui':{availableDisplayModes:['inline','fullscreen'],preferredDisplayMode:'fullscreen'}},

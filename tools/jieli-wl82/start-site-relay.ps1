@@ -9,6 +9,7 @@ param(
     [string]$SitesTokenFile,
     [string]$BridgeTokenFile,
     [switch]$AllowSwitch,
+    [switch]$AllowOfficialUpdate,
     [switch]$PrepareOnly
 )
 Set-StrictMode -Version Latest
@@ -117,6 +118,7 @@ foreach ($item in @(
     }
 }
 if ($AllowSwitch) { $arguments += '--allow-switch' }
+if ($AllowOfficialUpdate) { $arguments += '--allow-official-update' }
 # Validate origins locally without making HTTP requests or loading USB support.
 & $runtime -c 'import sys; sys.path.insert(0,sys.argv[3]); import site_relay as r; assert sys.version_info >= (3,11); r.normalize_origin(sys.argv[1],site=True); r.normalize_origin(sys.argv[2],site=False)' $SiteUrl $BridgeUrl $PSScriptRoot
 if ($LASTEXITCODE -ne 0) { throw 'Relay runtime or origin validation failed.' }
@@ -146,3 +148,4 @@ $process.Refresh()
 if ($process.HasExited) { throw 'Relay exited during launch. Inspect private relay logs; existing services were not changed.' }
 Write-Output "Outbound relay process started, PID $($process.Id). Check the private Site for authenticated connection status."
 Write-Output ('App switching enabled: ' + [bool]$AllowSwitch)
+Write-Output ('Official updater handoff enabled: ' + [bool]$AllowOfficialUpdate)

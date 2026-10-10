@@ -13,8 +13,8 @@ App iframe, and live Site WebMCP Refresh worked through the authenticated
 local relay. The native plugin/panel is the user's selected primary interface;
 it does not require a Chrome extension.
 
-The local bridge currently has no configured protected session or official
-updater. Inventory reported COM4 and CDC/audio interfaces, and six validated
+At the recorded 2026-10-09 metadata check, the local bridge had no configured
+protected session or official updater. Inventory reported COM4 and CDC/audio interfaces, and six validated
 private packages all remained `ready:false`. An MDX plan reached the bridge
 but correctly failed on the protected-session prerequisite. No helper was
 created and no device I/O, firmware write, or physical acceptance occurred.
@@ -74,7 +74,8 @@ for the exact evidence and remaining boundaries.
 | App library | `GET /v1/catalog` | Variant metadata, digest and baseline readiness; no firmware bytes. |
 | Offline plan | `POST /v1/jobs`, `plan_app` | Existing catalog ID and verified baseline; no device I/O. |
 | Saved job inspection | `GET /v1/jobs/<id>` | Resume the original ID without resubmission. |
-| App switching | `POST /v1/jobs`, `switch_app` | Explicit entry method, reviewed approval and protected writer checks. |
+| App switching | `POST /v1/jobs`, `switch_app` | Approved `auto`, `serial` or `already_uboot` entry, package digest and protected writer checks. |
+| Official firmware | `POST /v1/jobs`, `official_updater` | Separate human approval and local enable flag; exact updater executable digest; fixed vendor GUI handoff. |
 
 Relay switching is disabled by default. Enabling its local capability is a
 deliberate bench configuration step, not permission for a particular write.
@@ -84,6 +85,34 @@ digest and entry method; queue insertion and approval consumption are atomic.
 The approval ID becomes the durable bridge job ID. The confirmation tool is
 app-visible rather than a model-visible shortcut. The local bridge still has
 no per-write consent field; the adapter owns this approval boundary.
+
+Official handoff has its own disabled-by-default local
+`-AllowOfficialUpdate`/`--allow-official-update` capability and expiring one-use
+approval bound to the reviewed updater SHA-256. Its strict bridge request has
+only `id`, `operation` and `expected_sha256`; paths, commands, arguments and
+firmware payloads cannot be supplied remotely. The backend rechecks the pinned
+updater and fresh mode before GUI launch; the relay preserves the same ID on uncertainty.
+
+Passive inventory chooses one protected CDC or UBOOT route for `auto`; exact
+stock/OTA MIDI names select the official GUI route. Inventory errors, duplicate
+or conflicting candidates, incomplete MIDI pairs and changed mode prevent
+automatic selection. WinMM capability queries open no MIDI endpoint. MIDI
+names establish a routing candidate, not unique-unit provenance. The selected
+custom app still uses the existing protected writer and catalog digest.
+
+The generic manufacturer M-UPGRADE GUI accepts official `.fwsc` selection;
+the operator completes that flow locally. Preserve its full Qt dependency
+directory. The older FM1-specific GUI embeds V14; the separately published
+official package is V15. See the [manufacturer downloads and instructions](https://www.m-vave.com/download).
+The adapter does not implement a direct SysEx sender or convert app bundles to
+`.fwsc`. A saved successful GUI handoff reports `written_verified:false` and
+persistently blocks device jobs. After official completion, establish a fresh
+protected session and verified current-unit baseline; retain prior evidence.
+
+Auto routing and official handoff are implementation capabilities with offline
+coverage. Hosted deployment, actual GUI operation, readback and physical
+screen/audio/control acceptance require their own dated evidence. The earlier
+metadata acceptance above does not establish those results.
 
 Only metadata crosses the relay. Keep private catalog bundle JSON, firmware,
 ROM/music inputs, baseline images, session descriptors, receipts, device paths

@@ -5,4 +5,3 @@ tqdm==4.67.1
 crcmod==1.7
 colorama==0.4.6
 pyserial==3.5
-pycryptodomex==3.23.0

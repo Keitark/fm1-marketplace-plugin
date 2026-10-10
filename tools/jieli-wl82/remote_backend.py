@@ -10,6 +10,7 @@ import tempfile
 
 from remote_catalog import Catalog, rebase
 from job_progress import progress_for_job
+from update_mode import classify_update_mode, enumerate_midi_endpoints
 
 SIZE = 0x100000
 PS = r'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
@@ -74,8 +75,8 @@ class WindowsBackend:
                                  description=p.description, serial_number=p.serial_number)
                             for p in list_ports.comports()
                             if (p.vid, p.pid) == (0x3654, 0x5155)]
-        except ImportError:
-            inventory_error = 'pyserial missing; install laptop requirements'
+        except (ImportError, OSError):
+            inventory_error = 'Serial port enumeration unavailable; check laptop requirements'
         disks = []
         if sys.platform == 'win32':
             script = ("@(Get-CimInstance Win32_DiskDrive | Where-Object "
@@ -94,6 +95,12 @@ class WindowsBackend:
                     inventory_error=inventory_error, device_io=False,
                     session_configured=bool(self.session))
         info['official_updater_configured'] = bool(self.updater and self.updater_sha256)
+        midi = enumerate_midi_endpoints()
+        info['midi_endpoints'] = [endpoint for endpoint in midi['endpoints']
+                                  if 'fm-1' in endpoint['name'].lower() or 'fm1' in endpoint['name'].lower()]
+        info['inventory_error'] = inventory_error or midi['error']
+        info['update_mode'] = classify_update_mode(serial_ports, disks, midi['endpoints'], info['inventory_error'])
+        info['official_update'] = self.official_update_metadata(info['update_mode'])
         if self.session:
             state = read_json(self.session / 'state.json')
             info['session'] = {key: state.get(key) for key in
@@ -104,7 +111,23 @@ class WindowsBackend:
             snapshot_worker = self.session / 'tools/jieli-wl82/flash_session_worker.py'
             info['session']['remote_read_supported'] = (
                 snapshot_worker.exists() and 'read_firmware' in snapshot_worker.read_text(encoding='utf-8'))
+            if (info['session']['operation'] != 'idle' or info['session']['blocked'] or info['session']['reset_pending']
+                    or info['session']['needs_observation'] or info['session']['loader_running'] or info['session']['stopped']):
+                info['official_update']['available'] = False
         return info
+
+    def official_update_metadata(self, mode):
+        configured = bool(self.updater and isinstance(self.updater_sha256, str)
+                          and re.fullmatch('[0-9a-f]{64}', self.updater_sha256))
+        verified = False
+        if configured and sys.platform == 'win32' and self.updater.name.lower() in ('m-upgrade-fm1.exe', 'm-upgrade.exe'):
+            try:
+                verified = self.updater.is_file() and digest(self.updater.read_bytes()) == self.updater_sha256
+            except OSError:
+                pass
+        return {'configured': configured, 'sha256': self.updater_sha256 if configured else None,
+                'available': bool(verified and mode.get('official_available')),
+                'package_format': '.fwsc', 'handoff': True}
 
     def job_progress(self, job, request):
         """Persisted metadata only; never enumerate/open USB or serial devices."""
@@ -122,7 +145,9 @@ class WindowsBackend:
     def install_catalog(self, bundle):
         return self.packages.install(bundle)
 
-    def execute(self, operation, request=None, loader_state=None, catalog_id=None, entry_method=None):
+    def execute(self, operation, request=None, loader_state=None, catalog_id=None, entry_method=None, expected_sha256=None):
+        if expected_sha256 is not None and operation != 'official_updater':
+            raise ValueError('Expected updater SHA256 is only accepted for official_updater')
         if operation == 'plan_app':
             if request is not None or loader_state is not None or entry_method is not None:
                 raise ValueError('App plan requires only catalog id')
@@ -137,13 +162,13 @@ class WindowsBackend:
                 return {'ok': True, 'data': {'already_current': True, 'device_io': False, 'sectors': []}}
             return self._pipe('plan', prepared)
         if operation == 'switch_app':
-            if request is not None or loader_state is not None or entry_method not in ('serial', 'already_uboot'):
-                raise ValueError('Choose serial or already_uboot for app switching')
+            if request is not None or loader_state is not None or entry_method not in ('auto', 'serial', 'already_uboot'):
+                raise ValueError('Choose auto, serial or already_uboot for app switching')
             return self.switch_app(catalog_id, entry_method)
         if operation == 'official_updater':
             if any(x is not None for x in (request, loader_state, catalog_id, entry_method)):
-                raise ValueError('Official updater takes no remote arguments')
-            return self.launch_official_updater()
+                raise ValueError('Official updater requires only the expected local executable SHA256')
+            return self.launch_official_updater(expected_sha256)
         if catalog_id is not None or entry_method is not None:
             raise ValueError('Catalog fields are only accepted for switch_app')
         return self._pipe(operation, request, loader_state)
@@ -206,6 +231,16 @@ class WindowsBackend:
         if request['sha256'] == state['baseline_sha256']:
             return {'ok': True, 'data': {'already_current': True, 'catalog_id': catalog_id, 'device_io': False}}
         steps = []
+        automatic = entry_method == 'auto'
+        selected = None
+        selected_identity = None
+        if automatic:
+            first_inventory = self.status()
+            selected = first_inventory['update_mode']
+            selected_identity = self.update_identity(first_inventory)
+            entry_method = selected['app_entry_method']
+            if entry_method not in ('serial', 'already_uboot'):
+                return {'ok': False, 'error': 'Automatic app switching requires one serial or UBOOT device; official MIDI mode uses the vendor updater'}
         def call(op, image=None):
             result = self._pipe(op, image)
             steps.append({'operation': op, 'response': result})
@@ -214,6 +249,12 @@ class WindowsBackend:
         if result['ok'] is not True:
             return result
         inventory = self.status()
+        mode = inventory.get('update_mode')
+        if automatic and (not mode or mode['app_entry_method'] != entry_method or mode['mode'] != selected['mode']
+                          or self.update_identity(inventory) != selected_identity):
+            return {'ok': False, 'error': 'Device update mode changed during offline planning; inspect the device before another request'}
+        if mode and mode['app_entry_method'] not in ('serial', 'already_uboot'):
+            return {'ok': False, 'error': 'No unambiguous protected app update route; use the official updater only for recognized MIDI mode'}
         disks = inventory['uboot_disks']
         if len(disks) > 1:
             return {'ok': False, 'error': 'Multiple UBOOT disks; select exactly one device locally'}
@@ -247,20 +288,46 @@ class WindowsBackend:
                                      'serial_boot_verified': True, 'physical_acceptance': False,
                                      'reset_response_ok': reset_result['ok']}}
 
-    def launch_official_updater(self):
+    @staticmethod
+    def update_identity(inventory):
+        """Compare passive identities around the offline plan; never expose them."""
+        return ([(item.get('port'), item.get('vid'), item.get('pid'), item.get('serial_number'))
+                 for item in inventory.get('serial_ports', [])],
+                [(item.get('DeviceID'), item.get('PNPDeviceID'), item.get('Model'))
+                 for item in inventory.get('uboot_disks', [])])
+
+    def launch_official_updater(self, expected_sha256):
         """Handoff to the real vendor MIDI/SysEx host, never emulate its writer."""
         if sys.platform != 'win32' or not self.updater or not self.updater_sha256:
             return {'ok': False, 'error': 'Configure the official Windows updater path and SHA256 locally'}
+        if not isinstance(expected_sha256, str) or not re.fullmatch('[0-9a-f]{64}', expected_sha256):
+            return {'ok': False, 'error': 'Official updater requires the exact reviewed executable SHA256'}
+        if expected_sha256 != self.updater_sha256:
+            return {'ok': False, 'error': 'Reviewed updater SHA256 does not match local configuration'}
         if self.updater.name.lower() not in ('m-upgrade-fm1.exe', 'm-upgrade.exe'):
             return {'ok': False, 'error': 'Expected the official M-UPGRADE executable'}
-        if digest(self.updater.read_bytes()) != self.updater_sha256:
+        try:
+            verified = digest(self.updater.read_bytes()) == self.updater_sha256
+        except OSError:
+            verified = False
+        if not verified:
             return {'ok': False, 'error': 'Official updater executable hash changed'}
         if self.session:
             state = read_json(self.session / 'state.json')
-            if state.get('blocked') or state.get('operation') != 'idle' or state.get('reset_pending') or state.get('needs_observation'):
+            if state.get('blocked') or state.get('operation') != 'idle' or state.get('reset_pending') or state.get('needs_observation') or state.get('loader_running') or (self.session / 'stopped.txt').exists():
                 return {'ok': False, 'error': 'Resolve protected session before handing device to M-UPGRADE'}
+        inventory = self.status()
+        mode = inventory['update_mode']
+        if mode['mode'] not in ('sysex', 'ota_sysex') or mode['official_available'] is not True:
+            return {'ok': False, 'error': 'Official updater requires one freshly recognized stock or OTA MIDI input/output pair'}
+        # status reads the protected state after passive enumeration, so a
+        # locally changed latch during inventory cannot authorize GUI handoff.
+        fresh = inventory.get('session')
+        if fresh and (fresh.get('operation') != 'idle' or fresh.get('blocked') or fresh.get('reset_pending')
+                      or fresh.get('needs_observation') or fresh.get('loader_running') or fresh.get('stopped')):
+            return {'ok': False, 'error': 'Resolve protected session before handing device to M-UPGRADE'}
         proc = subprocess.Popen([str(self.updater)], cwd=self.updater.parent)
-        return {'ok': True, 'data': {'handoff': True, 'pid': proc.pid, 'written_verified': False,
+        return {'ok': True, 'data': {'handoff': True, 'pid': proc.pid, 'written_verified': False, 'sha256': expected_sha256, 'mode': mode['mode'],
                                     'message': 'Complete the official MIDI/SysEx update on the laptop. Start a fresh session with a verified baseline before protected switching resumes.'}}
 
     def baseline(self):

@@ -90,13 +90,30 @@ authenticated Site connection; verify that connection on the Site.
 App switching is disabled by default. `-AllowSwitch` (Python `--allow-switch`)
 is a deliberate local enable flag, in addition to the hosted Site's explicit
 human confirmation flow. An enabled relay submits only the confirmed catalog
-ID and exact `serial` or `already_uboot` entry method, after checking the approved
+ID and exact `auto`, `serial` or `already_uboot` entry method, after checking the approved
 package SHA-256 against current catalog metadata and the approval's expiry.
 Catalog IDs are immutable in the existing bridge: a different package requires
 a new ID. Do not enable switching
 until the bench owner has verified the current protected session and physical
 conditions. Stop this relay locally by its recorded PID when it is no longer
 needed; this does not stop the bridge.
+
+Official updater handoff has a separate disabled-by-default capability:
+`-AllowOfficialUpdate` (Python `--allow-official-update`). It submits only a
+human-confirmed executable SHA-256. Before launch, the bridge rechecks its
+configured updater digest and fresh stock/OTA MIDI mode. The bridge opens its fixed
+local M-UPGRADE GUI with the vendor directory as its working directory; no
+caller supplies an executable, path, firmware bytes or GUI arguments. The
+operator selects the official `.fwsc` and completes the vendor update locally.
+Preserve the full downloaded vendor directory, including Qt DLLs and plugin
+subdirectories. Configuring only an EXE does not establish its dependency closure.
+
+Auto chooses serial or already-in-UBOOT entry for protected catalog bundles;
+official MIDI/SysEx mode uses the separate vendor handoff. Conflicting,
+unrecognized or incomplete inventory fails before device submission. Mode
+names are routing hints rather than proof of a unique physical unit. This
+implementation neither emulates the vendor SysEx writer nor converts custom
+bundles to `.fwsc`.
 
 For one diagnostic poll cycle, Python supports `--once` with the same origin,
 state, and credential options. The continuous loop defaults to a three-second
@@ -106,7 +123,7 @@ HTTP/backend exception text.
 ## Wire contract and operation boundaries
 
 All Site calls carry both Site credentials. `POST /relay/heartbeat` receives
-`{"allow_switch":false}` by default. `POST /relay/poll` receives `{}` and returns
+`{"allow_switch":false,"allow_official_update":false}` by default. `POST /relay/poll` receives `{}` and returns
 `{"tasks":[…],"connected":true}`. A task has exactly `id`, `operation`, and
 `arguments`; IDs are 32 lowercase hexadecimal characters.
 
@@ -117,6 +134,7 @@ All Site calls carry both Site credentials. `POST /relay/heartbeat` receives
 | `job` | `{job_id}` | `GET /v1/jobs/<job_id>` |
 | `plan_app` | `{catalog_id}` | `POST /v1/jobs` with the task's own ID |
 | `switch_app` | `{catalog_id,entry_method,expected_sha256,approval_expires}` | Recheck `GET /v1/catalog`, then `POST /v1/jobs` with the task's own ID, only when locally enabled |
+| `official_updater` | `{expected_sha256,approval_expires}` | `POST /v1/jobs` with the task's own ID and reviewed updater digest, only when separately enabled; the backend revalidates before GUI launch |
 
 No caller can select a URL, raw path, shell command, reset, read-firmware action,
 binary upload/download, catalog installation, or arbitrary bridge operation.
@@ -125,8 +143,10 @@ Catalog IDs are lowercase slugs of at most 64 characters. The Site owns human
 authorization; the relay owns transport validation, local enablement, and
 durable submission recovery. `expected_sha256` is 64 lowercase hexadecimal
 characters; `approval_expires` is an integer UNIX timestamp in seconds. They
-are persisted in the relay journal and verified immediately before submission,
-but never forwarded as unexpected fields to the strict bridge API. Missing,
+are persisted in the relay journal and verified immediately before submission.
+Switch approval fields remain relay-local; the official handoff forwards only
+`expected_sha256` with `id` and `operation` to its strict bridge request.
+Missing,
 changed, ambiguous, or unready catalog variants fail before any submission.
 
 The relay posts `/relay/result` with the exact task ID and a terminal delivery
@@ -172,15 +192,22 @@ conflict preserves the receipt; none authorizes another bridge job POST.
 
 If a bridge job submission loses its response, the relay only queries
 `GET /v1/jobs/<saved-task-id>`. It does not resubmit, create a new ID, clear an
-unknown latch, or infer success. On restart an `executing` plan/switch task is
+unknown latch, or infer success. On restart an `executing` plan/switch/updater task is
 recovered through the same GET-only path even when switching is now disabled
-or the original approval has expired. A `prepared` switch whose approval has
-expired fails without submission, including after a relay restart.
+or the original approval has expired. A `prepared` switch or updater handoff
+whose approval has expired fails without submission, including after a relay restart.
 If no definite saved job can be obtained, delivery is `unknown` with
 `bridge_outcome_unknown`. Inspect the local bridge and protected session before
 initiating any new device operation. Restarted metadata GET tasks may safely
 be read again. Corrupt journal state blocks startup; deleting a journal to
 force retries defeats this safety property and is not a recovery procedure.
+
+A successful official handoff is saved as a GUI handoff with
+`written_verified:false`; it persistently blocks further bridge device jobs.
+After local vendor completion, establish a fresh protected session and verified
+current-unit baseline through the bench workflow. Preserve the prior journals
+and receipts. Neither a GUI launch, passive mode detection nor these offline
+checks establishes device-write or physical acceptance.
 
 ## Offline validation
 

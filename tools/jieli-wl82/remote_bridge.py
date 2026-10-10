@@ -39,9 +39,9 @@ SHA_PATTERN = re.compile(r"[0-9a-f]{64}\Z")
 CATALOG_PATTERN = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}\Z")
 IMAGE_OPERATIONS = frozenset({"plan", "flash", "retry_flash", "recover_flash"})
 NO_ARGUMENT_OPERATIONS = frozenset(
-    {"serial_status", "observe", "enter_uboot", "reset", "environment", "official_updater"}
+    {"serial_status", "observe", "enter_uboot", "reset", "environment"}
 )
-OPERATIONS = IMAGE_OPERATIONS | NO_ARGUMENT_OPERATIONS | {"read_firmware", "switch_app", "plan_app"}
+OPERATIONS = IMAGE_OPERATIONS | NO_ARGUMENT_OPERATIONS | {"read_firmware", "switch_app", "plan_app", "official_updater"}
 OFFLINE_OPERATIONS = frozenset({"plan", "environment", "plan_app"})
 TERMINAL_STATUSES = frozenset({"succeeded", "failed", "unknown"})
 
@@ -118,6 +118,8 @@ def normalize_request(body: Any) -> dict[str, Any]:
         required.update({"catalog_id", "entry_method"})
     elif operation == "plan_app":
         required.add("catalog_id")
+    elif operation == "official_updater":
+        required.add("expected_sha256")
     if set(body) != required:
         raise BridgeError(400, "unexpected or missing request fields")
     if operation in IMAGE_OPERATIONS:
@@ -152,8 +154,11 @@ def normalize_request(body: Any) -> dict[str, Any]:
         catalog_id = body["catalog_id"]
         if not isinstance(catalog_id, str) or not CATALOG_PATTERN.fullmatch(catalog_id):
             raise BridgeError(400, "catalog_id must be a lowercase catalog slug of at most 64 characters")
-        if operation == "switch_app" and body["entry_method"] not in ("serial", "already_uboot"):
-            raise BridgeError(400, "entry_method must be serial or already_uboot")
+        if operation == "switch_app" and body["entry_method"] not in ("auto", "serial", "already_uboot"):
+            raise BridgeError(400, "entry_method must be auto, serial or already_uboot")
+    elif operation == "official_updater":
+        if not isinstance(body['expected_sha256'], str) or not SHA_PATTERN.fullmatch(body['expected_sha256']):
+            raise BridgeError(400, 'expected_sha256 must be 64 lowercase hexadecimal characters')
     return _copy_json(body)
 
 
@@ -366,6 +371,8 @@ class JobManager:
                 )
             elif operation == "plan_app":
                 result = self.backend.execute(operation, catalog_id=request["catalog_id"])
+            elif operation == "official_updater":
+                result = self.backend.execute(operation, expected_sha256=request['expected_sha256'])
             else:
                 result = self.backend.execute(operation)
             if not isinstance(result, dict) or type(result.get("ok")) is not bool:
