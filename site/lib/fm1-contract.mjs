@@ -1,5 +1,5 @@
 import { ICONS } from './fm1-icon.mjs';
-export const RESOURCE_URI = 'ui://fm1/device-panel-v5.html';
+export const RESOURCE_URI = 'ui://fm1/device-panel-v6.html';
 export const PROFILES = [
   {profile:'nes',title:'NES',description:'Play your prepared cartridge collection.',symbol:'N'},
   {profile:'doom',title:'Doom',description:'The original engine, adapted for FM1.',symbol:'D'},

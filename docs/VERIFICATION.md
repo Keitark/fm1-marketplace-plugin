@@ -1,5 +1,55 @@
 # Integration verification
 
+## FM1 appearance update, 2026-10-10
+
+Site v6 adds twelve prepared palettes and five independently selectable
+patterns, plus custom background/accent RGB pickers and hexadecimal entry.
+The palette engine derives readable foregrounds, surfaces, focus indicators and
+button text. Preferences stay in local storage when supported; blocked storage
+keeps the current panel usable and reports that the setting cannot be retained.
+No appearance control calls MCP services or operates the device.
+
+All **100 Site tests passed** (52 UI, 40 server, 4 SDK, 4 appearance engine).
+These cover restored/custom/reset preferences, blocked/corrupt storage, input
+validation, unchanged relay tasks, palette/custom contrast and resource aliases.
+Typechecking and the production build passed. Source
+`0ea345a93554ab5f65b5c2c38c77fa03a2d4e8d0` was pushed and packaged by the source
+workflow. Private deployment `appgdep_6ac9a27c4a388191a7656970d906f770`
+succeeded at **11:27 JST**, with MCP enabled and environment revision 1.
+The server advertises `2.2.0`, resource `ui://fm1/device-panel-v6.html`, and
+v1/v2/v3/v4/v5 aliases. Official SDK pins remain unchanged.
+
+Browser QA used the actual UI in a local synthetic MCP host with device actions
+disabled. It verified Mint Light/Circuit Grid, Royal Violet/Scanlines, custom
+RGB/Dots, persistence after reload and reset. At a 420-pixel viewport the iframe
+had equal client/scroll widths of 390 pixels, confirming no horizontal overflow.
+
+The installed native Codex panel subsequently loaded **Appearance**, reporting
+the actual FM1 on COM10. Selecting **Mint Light** and **Circuit Grid** changed
+the visible UI and reported **Appearance saved on this browser**. The native
+screenshot below records this selection. This resolves the earlier stale-v4
+resource observation for the newly opened panel. Native custom hex colours
+(`#f8f4ee` background, `#007ca8` accent) and Dots also applied, with the body
+reporting custom/light and `rgb(248,244,238)`. Native reset restored FM1
+Mint/Solid; the earlier FM1 Mint/Circuit Grid preference was then restored.
+Persistence across reopening was verified in the synthetic host only.
+
+A later read-only native Refresh failed with **MCP app cannot call tool outside
+its trusted tool scope: open_fm1_library**. A second assistant library call had
+returned **Unknown tool**, and FM1 tools are absent from the current tool
+inventory. Sites still reports an active v6, no disabling authority and the
+same MCP endpoint/plugin ID. Plugin metadata lookup returned 404. The cause
+is unconfirmed; the loaded panel's local Appearance controls remain usable,
+but current remote tool availability and native reopening are not accepted.
+No firmware operation was attempted during this check. Follow-up is tracked in
+[issue #6](https://github.com/Keitark/fm1-marketplace-plugin/issues/6).
+
+![Installed native FM1 panel with Mint Light and Circuit Grid](images/fm1-native-appearance-mint-light.png)
+
+![Installed native Appearance controls restored to FM1 Mint and Circuit Grid](images/fm1-native-appearance-final.png)
+
+![Synthetic Royal Violet and Scanlines preview](images/fm1-appearance-violet-preview.png)
+
 ## Subsequent NES programming and progress correction, 2026-10-10
 
 The saved switch job `9067aa03ef7f4826b9f143722cb5635e` completed at
