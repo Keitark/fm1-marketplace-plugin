@@ -6,21 +6,64 @@ for this integration. The private [FM1 App Library website](https://fm1-app-libr
 is also available; sign in with the owner account when prompted. Both use the
 [black/mint FM-1 mark](../site/public/fm1-icon.png).
 
+The latest host tool calls are unavailable despite active v6. Native
+**Refresh** rejects `open_fm1_library` as outside its trusted tool scope; a
+repeated assistant open returned **Unknown tool**. Local Appearance controls
+still work. The cause and recovery remain unconfirmed, and reopening is not a
+verified fix. Follow [issue #6](https://github.com/Keitark/fm1-marketplace-plugin/issues/6).
+
+## Appearance
+
+The Appearance controls were published on 2026-10-10 at 11:27 JST for resource
+`ui://fm1/device-panel-v6.html`, server version **2.2.0**, with v1-v5 aliases.
+The newly opened installed v6 panel showed the actual FM1 on COM10 and applied
+**Mint Light / Circuit Grid**, reporting **Appearance saved on this browser**.
+Open the **Appearance**
+expander and choose a palette, then a **Background pattern**.
+
+The 12 palettes are **FM1 Mint**, **Mint Light**, **Midnight Blue**, **Ocean Cyan**,
+**Royal Violet**, **Sakura Pink**, **Signal Red**, **Amber**, **Forest Green**,
+**Graphite**, **Paper**, and **High Contrast**. The five patterns are **Solid**,
+**Circuit Grid**, **Dots**, **Scanlines**, and **Diagonal Stripes**: 60 preset
+combinations in total.
+
+For custom RGB colors, use the **Background colour** and **Accent colour**
+pickers or enter six-digit hex values such as `#101a18`. Foreground and surface
+colors are derived from those choices to adapt contrast. **Reset to FM1 Mint**
+restores the default palette and Solid pattern.
+
+Preferences stay local and are saved only where the host permits
+`localStorage`. If storage is unavailable, the status explains that the choice
+applies to this panel only. Appearance changes make no external, server or
+hardware calls.
+
+The [native Mint Light / Circuit Grid screenshot](images/fm1-native-appearance-mint-light.png)
+records that installed-panel check. Native custom background `#f8f4ee` and
+accent `#007ca8` with Dots also passed, and native Reset restored FM1 Mint /
+Solid. The prior FM1 Mint / Circuit Grid choice was then restored in the
+[final native screenshot](images/fm1-native-appearance-final.png), which shows
+all 12 choices. Persistence after reopening and additional palette checks were
+verified only in the synthetic preview and formal tests.
+
+The [Mint Light / Circuit Grid preview](images/fm1-appearance-mint-light-preview.png)
+and [Royal Violet / Scanlines preview](images/fm1-appearance-violet-preview.png)
+show synthetic embedded-host previews, rather than an actual native bench panel.
+
 ## Progress and the latest NES switch (2026-10-10)
 
 The progress bar appears under **Saved requests & progress** when a job is
-selected. The updated UI follows the original job automatically through sector
+selected. With host tools available, the updated UI follows the original job automatically through sector
 verification, full readback and startup. A full sector bar alone does not mean
 the entire operation has finished. Tracking pauses on connection loss, an
 unknown outcome, or its polling limit; **Inspect job** resumes that exact ID
 without submitting the firmware operation again.
 
-To load updated UI code, close the old FM1 panel and reopen the newest plugin
-card. **Refresh** updates device/catalog data; it does not reload the UI
-resource. Published v5 preserves selected progress. The freshly opened native
-panel still received cached v4 during the October 10 check, so reopening alone
-may not load v5 immediately. Wait for the host's metadata/resource cache to
-refresh, then reopen; a directly connected custom MCP plugin also has a
+**Refresh** updates device/catalog data when host tools are available; it does
+not reload the UI resource. Published v6 preserves selected progress. During the earlier v5 check,
+a freshly opened native panel received cached v4; the later v6 panel loaded
+the current Appearance controls successfully. This historical cache result
+does not establish recovery for the current tool-scope failure. A directly
+connected custom MCP plugin has a documented
 [connection-level Refresh flow](https://developers.openai.com/plugins/deploy/connect-chatgpt).
 That flow differs from the panel's device-data button. Older saved request
 entries are delivery snapshots; use **Inspect job** for current device progress.
@@ -186,11 +229,12 @@ successful startup, screen output, sound, or working keys. An unknown device
 outcome needs inspection by the bench owner before another device operation.
 Physical acceptance remains a separate bench check.
 
-Site version 4 is deployed owner-private with MCP enabled, and the current
-native panel is accepted in Codex. The server also serves its UI at the older
-v1/v2/v3 resource URIs for installed-plugin compatibility. An older cached tool
-title can still appear;
-the verified panel itself shows the current interface. See
+Site version 6 is deployed owner-private with MCP enabled; actual native v6
+Mint Light / Circuit Grid rendering is accepted in Codex. The initial v4
+native panel acceptance remains historical. The server serves its current UI
+through v1-v5 aliases
+for installed-plugin compatibility, but an older cached resource or tool title
+can still appear. See
 [VERIFICATION.md](VERIFICATION.md) for the dated deployment, native panel,
 metadata, and hardware acceptance evidence.
 

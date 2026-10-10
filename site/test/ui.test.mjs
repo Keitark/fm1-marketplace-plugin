@@ -7,13 +7,15 @@ import { database, connect, cacheCatalog, cacheInventory, digest } from './d1.mj
 
 const tick=()=>new Promise(resolve=>setTimeout(resolve,15));
 async function until(predicate){for(let attempt=0;attempt<100;attempt++){if(predicate())return;await tick();}assert.fail('Panel did not reach the expected state.');}
-async function panel({embedded=false,initial=true,serverTools=true,inventory=null,official=false,loseConfirmationReply=false,jobData=null,beforeCall=null,nativeControls=false,omitPlanJobId=false}={}){
+async function panel({embedded=false,initial=true,serverTools=true,inventory=null,official=false,loseConfirmationReply=false,jobData=null,beforeCall=null,nativeControls=false,omitPlanJobId=false,preferences=null,storageBlocked=false}={}){
   const env=database();connect(env,true,official);cacheCatalog(env);if(inventory)cacheInventory(env,'alice',inventory);
-  const nodes=new Map(),registered=new Map(),requests=[],requestArgs=[],events=new Map(),notifications=[],timers=new Map(),delays=[];
-  function node(id){if(!nodes.has(id)){let text='';nodes.set(id,{history:[],get textContent(){return text;},set textContent(value){text=value;this.history.push(value);},innerHTML:'',value:id==='variant-nes'?'nes-test':'',dataset:{profile:'nes',plan:'nes',switch:'nes'},hidden:true,open:false,style:{},querySelectorAll:selector=>id==='library'&&nativeControls?selector==='select'?[node('variant-nes')]:selector==='[data-plan]'?[node('plan-nes')]:selector==='[data-switch]'?[node('switch-nes')]:[]:[],querySelector:selector=>id==='library'&&nativeControls?(selector.startsWith('[data-profile=')?node('variant-nes'):node('digest-nes')):null,removeAttribute(name){if(name==='value')delete this.value;},showModal(){this.open=true;},close(){this.open=false;},addEventListener(name,fn){this[name]=fn;}});}return nodes.get(id);}
+  const seededTasks=env.DB.sqlite.prepare('SELECT * FROM relay_tasks ORDER BY id').all();
+  const nodes=new Map(),registered=new Map(),requests=[],requestArgs=[],events=new Map(),notifications=[],timers=new Map(),delays=[],storage=new Map(),storageWrites=[];
+  if(preferences!==null)storage.set('fm1.appearance.v1',typeof preferences==='string'?preferences:JSON.stringify(preferences));
+  function node(id){if(!nodes.has(id)){let text='';const attributes=new Map();nodes.set(id,{history:[],get textContent(){return text;},set textContent(value){text=value;this.history.push(value);},innerHTML:'',value:id==='variant-nes'?'nes-test':'',dataset:{profile:'nes',plan:'nes',switch:'nes'},hidden:true,open:false,style:{},querySelectorAll:selector=>id==='library'&&nativeControls?selector==='select'?[node('variant-nes')]:selector==='[data-plan]'?[node('plan-nes')]:selector==='[data-switch]'?[node('switch-nes')]:[]:[],querySelector:selector=>id==='library'&&nativeControls?(selector.startsWith('[data-profile=')?node('variant-nes'):node('digest-nes')):null,setAttribute(name,value){attributes.set(name,String(value));},getAttribute(name){return attributes.get(name)??null;},removeAttribute(name){attributes.delete(name);if(name==='value')delete this.value;},showModal(){this.open=true;},close(){this.open=false;},addEventListener(name,fn){this[name]=fn;}});}return nodes.get(id);}
   const initialData=await callTool(env,'alice','open_fm1_library',{});
   if(inventory)initialData.inventory=inventory;
-  const window={addEventListener(name,fn,options){events.set(name,fn);options?.signal?.addEventListener('abort',()=>events.delete(name));},removeEventListener(name){events.delete(name);}};
+  const window={localStorage:{getItem(key){if(storageBlocked)throw new Error('Local storage is blocked by this host.');return storage.get(key)??null;},setItem(key,value){if(storageBlocked)throw new Error('Local storage is blocked by this host.');storage.set(key,String(value));storageWrites.push({key,value:String(value)});}},addEventListener(name,fn,options){events.set(name,fn);options?.signal?.addEventListener('abort',()=>events.delete(name));},removeEventListener(name){events.delete(name);}};
   const parent=embedded?{postMessage(message){notifications.push(message);if(message.id===undefined||!message.method)return;queueMicrotask(async()=>{
     let response;
     try{
@@ -27,11 +29,12 @@ async function panel({embedded=false,initial=true,serverTools=true,inventory=nul
   window.parent=parent;
   function toolResult(answer){const {_approval,...data}=answer;return {content:[],structuredContent:data,...(_approval?{_meta:{approval_id:_approval}}:{})};}
   async function backend(name,args){requests.push(name);requestArgs.push({name,args});await beforeCall?.(name,args);const answer=await callTool(env,'alice',name,args);if(answer.request_id){const defaultJob={id:args.job_id||answer.job_id||answer.request_id,status:'succeeded',simulation:true},data=jobData?await jobData({name,args,answer,defaultJob}):defaultJob;if(data!==null)env.DB.sqlite.prepare('UPDATE relay_tasks SET state=?,result=? WHERE id=?').run('succeeded',JSON.stringify({status:'succeeded',data}),answer.request_id);}if(omitPlanJobId&&name==='plan_fm1_app'){const {job_id,...queued}=answer;return queued;}return answer;}
-  const document={body:{classList:{add(){}},dataset:{}},getElementById:node,modelContext:{async registerTool(tool,{signal}){registered.set(tool.name,tool);signal.addEventListener('abort',()=>registered.delete(tool.name));}}};
+  const properties=new Map();
+  const document={body:{classList:{add(){}},dataset:{},style:{setProperty(name,value){properties.set(name,String(value));},getPropertyValue(name){return properties.get(name)??'';}}},getElementById:node,modelContext:{async registerTool(tool,{signal}){registered.set(tool.name,tool);signal.addEventListener('abort',()=>registered.delete(tool.name));}}};
   const context=vm.createContext({document,window,AbortController,Map,Object,Number,JSON,RegExp,String,Error,URL,TextEncoder,TextDecoder,crypto,queueMicrotask,setTimeout:(fn,ms)=>{delays.push(ms);const timer=setTimeout(()=>{timers.delete(timer);fn();},ms>=10000?500:1);timers.set(timer,ms);return timer;},clearTimeout:timer=>{timers.delete(timer);clearTimeout(timer);},fetch:async(_url,options)=>{const input=JSON.parse(options.body);try{const answer=await backend(input.name,input.arguments);if(loseConfirmationReply&&input.name.startsWith('confirm_'))throw new Error('Confirmation reply lost.');return {ok:true,json:async()=>({structuredContent:answer})};}catch(error){return {ok:false,json:async()=>({error:error.message})};}}});
   for(const script of UI_HTML.matchAll(/<script>([\s\S]*?)<\/script>/g))vm.runInContext(script[1],context);
   await tick();
-  return {env,nodes,registered,requests,requestArgs,events,notifications,timers,delays,parent,window,node,async invoke(name,args){return registered.get(name).execute(args);},dispose(){events.get('pagehide')?.();}};
+  return {env,nodes,registered,requests,requestArgs,events,notifications,timers,delays,parent,window,document,storage,storageWrites,seededTasks,node,async invoke(name,args){return registered.get(name).execute(args);},dispose(){events.get('pagehide')?.();}};
 }
 test('host initial tool result renders without a duplicate library request',async()=>{const p=await panel({embedded:true});assert.equal(p.node('relay-state').textContent,'Connected');assert.equal(p.requests.length,0);assert.equal(p.registered.size,0);p.dispose();});
 test('initial host result renders even without serverTools capability',async()=>{const p=await panel({embedded:true,serverTools:false});assert.equal(p.node('relay-state').textContent,'Connected');assert.equal(p.requests.length,0);p.dispose();});
@@ -365,4 +368,118 @@ test('official native confirmation stops at vendor handoff and never claims firm
   assert.equal(reads,1);assert.equal(p.node('progress').hidden,true);assert.equal(p.node('job-id').value,id);
   assert.equal(JSON.parse(p.node('detail').textContent).firmware_transfer_verified,false);
   assert.equal(p.requests.filter(name=>name==='confirm_fm1_official_update').length,1);const count=p.requests.length;await tick();assert.equal(p.requests.length,count);p.dispose();
+});
+
+const appearanceKey='fm1.appearance.v1';
+const savedAppearance=p=>JSON.parse(p.storage.get(appearanceKey));
+function assertAppearanceStaysLocal(p){
+  assert.equal(p.requests.length,0);
+  assert.equal(p.notifications.filter(message=>message.method==='tools/call').length,0);
+  assert.deepEqual(p.env.DB.sqlite.prepare('SELECT * FROM relay_tasks ORDER BY id').all(),p.seededTasks);
+}
+
+test('saved custom appearance restores controls and background without a device or MCP request',async()=>{
+  const preferences={version:1,preset:'custom',pattern:'dots',background:'#eceff4',accent:'#2b6cb0'};
+  const p=await panel({embedded:true,preferences});
+  assert.equal(p.document.body.dataset.appearance,'custom');assert.equal(p.document.body.dataset.pattern,'dots');
+  assert.equal(p.document.body.style.getPropertyValue('--paper'),'#eceff4');assert.equal(p.document.body.style.getPropertyValue('--accent'),'#2b6cb0');
+  assert.equal(p.document.body.style.colorScheme,'light');assert.equal(p.node('appearance-summary').textContent,'Custom colours · Dots');
+  assert.equal(p.node('appearance-background').value,'#eceff4');assert.equal(p.node('appearance-background-hex').value,'#eceff4');
+  assert.equal(p.node('appearance-accent').value,'#2b6cb0');assert.equal(p.node('appearance-accent-hex').value,'#2b6cb0');
+  assert.equal(p.node('appearance-pattern').value,'dots');assert.equal(p.storageWrites.length,0);assertAppearanceStaysLocal(p);p.dispose();
+});
+
+test('selecting a palette applies its colours and saves the selection locally',async()=>{
+  const p=await panel({embedded:true});p.node('palette-mint-light').onclick();
+  assert.equal(p.document.body.dataset.appearance,'mint-light');assert.equal(p.document.body.style.colorScheme,'light');
+  assert.equal(p.document.body.style.getPropertyValue('--paper'),'#edf8f1');assert.equal(p.document.body.style.getPropertyValue('--accent'),'#16744f');
+  assert.equal(p.node('appearance-summary').textContent,'Mint Light · Solid');
+  assert.equal(p.node('palette-mint-light').getAttribute('aria-pressed'),'true');assert.equal(p.node('palette-fm1-mint').getAttribute('aria-pressed'),'false');
+  assert.deepEqual(savedAppearance(p),{version:1,preset:'mint-light',pattern:'solid',background:'#edf8f1',accent:'#16744f'});
+  assert.equal(p.node('appearance-status').textContent,'Appearance saved on this browser.');assertAppearanceStaysLocal(p);p.dispose();
+});
+
+test('changing the background pattern preserves the selected palette and saves its pattern',async()=>{
+  const p=await panel({embedded:true,preferences:{version:1,preset:'midnight-blue',pattern:'solid'}});
+  p.node('appearance-pattern').value='circuit-grid';p.node('appearance-pattern').onchange();
+  assert.equal(p.document.body.dataset.appearance,'midnight-blue');assert.equal(p.document.body.dataset.pattern,'circuit-grid');
+  assert.equal(p.node('appearance-summary').textContent,'Midnight Blue · Circuit Grid');
+  assert.deepEqual(savedAppearance(p),{version:1,preset:'midnight-blue',pattern:'circuit-grid',background:'#0c1729',accent:'#86baff'});
+  assertAppearanceStaysLocal(p);p.dispose();
+});
+
+test('the background colour picker creates a custom palette while preserving accent and pattern',async()=>{
+  const p=await panel({embedded:true,preferences:{version:1,preset:'ocean-cyan',pattern:'scanlines'}});
+  p.node('appearance-background').value='#ffffff';p.node('appearance-background').oninput();
+  assert.equal(p.document.body.dataset.appearance,'custom');assert.equal(p.document.body.style.getPropertyValue('--paper'),'#ffffff');
+  assert.equal(p.document.body.style.colorScheme,'light');assert.equal(p.node('appearance-background-hex').value,'#ffffff');
+  assert.equal(p.node('palette-ocean-cyan').getAttribute('aria-pressed'),'false');
+  assert.deepEqual(savedAppearance(p),{version:1,preset:'custom',pattern:'scanlines',background:'#ffffff',accent:'#67e6eb'});
+  assertAppearanceStaysLocal(p);p.dispose();
+});
+
+test('the accent colour picker updates the custom accent and saves it without changing the background',async()=>{
+  const p=await panel({embedded:true});p.node('appearance-accent').value='#ff6600';p.node('appearance-accent').oninput();
+  assert.equal(p.document.body.style.getPropertyValue('--accent'),'#ff6600');assert.equal(p.node('appearance-accent-hex').value,'#ff6600');
+  assert.deepEqual(savedAppearance(p),{version:1,preset:'custom',pattern:'solid',background:'#101a18',accent:'#ff6600'});
+  assertAppearanceStaysLocal(p);p.dispose();
+});
+
+test('complete custom hex input immediately applies and normalizes its colour',async()=>{
+  const p=await panel({embedded:true});p.node('appearance-background-hex').value=' #E6EDF5 ';p.node('appearance-background-hex').oninput();
+  assert.equal(p.node('appearance-background').value,'#e6edf5');assert.equal(p.node('appearance-background-hex').value,'#e6edf5');
+  assert.equal(p.document.body.style.getPropertyValue('--paper'),'#e6edf5');assert.equal(savedAppearance(p).background,'#e6edf5');
+  assert.equal(savedAppearance(p).preset,'custom');assertAppearanceStaysLocal(p);p.dispose();
+});
+
+test('reset restores and saves FM1 Mint with the solid pattern',async()=>{
+  const p=await panel({embedded:true,preferences:{version:1,preset:'custom',pattern:'diagonal-stripes',background:'#ffffff',accent:'#0055ff'}});
+  p.node('appearance-reset').onclick();
+  assert.equal(p.document.body.dataset.appearance,'fm1-mint');assert.equal(p.document.body.dataset.pattern,'solid');
+  assert.equal(p.document.body.style.colorScheme,'dark');assert.equal(p.node('appearance-summary').textContent,'FM1 Mint · Solid');
+  assert.equal(p.node('palette-fm1-mint').getAttribute('aria-pressed'),'true');
+  assert.deepEqual(savedAppearance(p),{version:1,preset:'fm1-mint',pattern:'solid',background:'#101a18',accent:'#a3efcc'});
+  assertAppearanceStaysLocal(p);p.dispose();
+});
+
+test('blocked preference storage still applies a palette and reports that it lasts for this panel',async()=>{
+  const p=await panel({embedded:true,storageBlocked:true});p.node('palette-sakura-pink').onclick();
+  assert.equal(p.document.body.dataset.appearance,'sakura-pink');assert.equal(p.node('appearance-summary').textContent,'Sakura Pink · Solid');
+  assert.equal(p.document.body.style.getPropertyValue('--paper'),'#fff0f5');assert.equal(p.document.body.style.getPropertyValue('--accent'),'#a32d67');
+  assert.equal(p.node('appearance-status').textContent,'Applied for this panel. This host does not allow saved colour preferences.');
+  assert.equal(p.storageWrites.length,0);assertAppearanceStaysLocal(p);p.dispose();
+});
+
+test('malformed saved JSON falls back to FM1 Mint without replacing the stored value',async()=>{
+  const p=await panel({embedded:true,preferences:'{broken'});
+  assert.equal(p.document.body.dataset.appearance,'fm1-mint');assert.equal(p.node('appearance-summary').textContent,'FM1 Mint · Solid');
+  assert.equal(p.document.body.style.getPropertyValue('--paper'),'#101a18');assert.equal(p.storage.get(appearanceKey),'{broken');
+  assert.equal(p.storageWrites.length,0);assertAppearanceStaysLocal(p);p.dispose();
+});
+
+test('an unsupported saved preference version uses the default palette and pattern',async()=>{
+  const p=await panel({embedded:true,preferences:{version:2,preset:'sakura-pink',pattern:'dots'}});
+  assert.equal(p.document.body.dataset.appearance,'fm1-mint');assert.equal(p.document.body.dataset.pattern,'solid');
+  assert.equal(p.node('appearance-background').value,'#101a18');assert.equal(p.node('appearance-accent').value,'#a3efcc');
+  assert.equal(p.storageWrites.length,0);assertAppearanceStaysLocal(p);p.dispose();
+});
+
+test('unknown saved palette and pattern with invalid colours fall back to safe defaults',async()=>{
+  const p=await panel({embedded:true,preferences:{version:1,preset:'missing',pattern:'missing',background:'url(https://invalid.test)',accent:'#123'}});
+  assert.equal(p.document.body.dataset.appearance,'fm1-mint');assert.equal(p.document.body.dataset.pattern,'solid');
+  assert.equal(p.document.body.style.getPropertyValue('--paper'),'#101a18');assert.equal(p.document.body.style.getPropertyValue('--accent'),'#a3efcc');
+  assert.equal(p.node('appearance-summary').textContent,'FM1 Mint · Solid');assert.equal(p.storageWrites.length,0);
+  assertAppearanceStaysLocal(p);p.dispose();
+});
+
+test('invalid custom hex inputs keep the applied colours and do not save invalid preferences',async()=>{
+  const p=await panel({embedded:true,preferences:{version:1,preset:'royal-violet',pattern:'circuit-grid'}});
+  for(const [kind,value] of [['background','#123'],['accent','red']]){
+    p.node('appearance-'+kind+'-hex').value=value;p.node('appearance-'+kind+'-hex').oninput();
+    assert.equal(p.node('appearance-status').textContent,'Enter a colour as #RRGGBB.');
+  }
+  assert.equal(p.document.body.dataset.appearance,'royal-violet');assert.equal(p.document.body.dataset.pattern,'circuit-grid');
+  assert.equal(p.document.body.style.getPropertyValue('--paper'),'#21162f');assert.equal(p.document.body.style.getPropertyValue('--accent'),'#c3a2ff');
+  assert.equal(p.storageWrites.length,0);
+  assertAppearanceStaysLocal(p);p.dispose();
 });

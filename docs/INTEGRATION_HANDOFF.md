@@ -2,6 +2,18 @@
 
 ## Current implementation
 
+Site v6 is now published owner-private with MCP enabled. The installed Codex
+panel has loaded its **Appearance** controls and accepted Mint Light/Circuit
+Grid, custom hex colours/Dots and reset. Twelve palettes, five patterns, custom
+RGB colours and local preference fallback are implemented; all 100 Site tests,
+typecheck and build passed. A later native Refresh is currently rejected by
+the host's trusted tool scope, and FM1 connector tools are absent from the
+current inventory despite Sites reporting an active MCP-ready v6. The cause
+is unconfirmed. The loaded Appearance controls still work; native reopening
+and current device tool availability require revalidation
+([issue #6](https://github.com/Keitark/fm1-marketplace-plugin/issues/6)). See the latest acceptance
+in [VERIFICATION.md](VERIFICATION.md) and controls in [USER_GUIDE.md](USER_GUIDE.md).
+
 This repository now includes the FM1 Site adapter, MCP App panel, top-level
 WebMCP tools and outbound Windows relay alongside the original store/bridge
 source. The initial publication at `b024784` established the source foundation;

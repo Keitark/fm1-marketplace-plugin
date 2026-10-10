@@ -7,7 +7,7 @@ The implementation includes the existing browser store/bridge, a Sites Worker
 with HTTP MCP at `/mcp`, a durable D1 request queue, an MCP App library panel,
 global/thread extension metadata, WebMCP registration, and an outbound Windows
 relay. The relay keeps the existing authenticated bridge and protected writer
-local. Version 5 is privately deployed, displays server version 2.1.1, and pins
+local. Version 6 is privately deployed, displays server version 2.2.0, and pins
 server SDK 2.3.1 and ext-apps 2.0.3. It detects serial, UBOOT and official
 MIDI/SysEx modes, selects
 the protected app route automatically, and provides a reviewed handoff to the
@@ -24,19 +24,42 @@ See [VERIFICATION.md](docs/VERIFICATION.md).
 
 The owner-private [FM1 App Library](https://fm1-app-library.keitark.chatgpt.site)
 is deployed and MCP-ready, and its plugin is installed. The native Codex panel
-uses the black/mint interface with connection, detected mode, packages and saved
-jobs. Its current resource is `ui://fm1/device-panel-v5.html`; the v1-v4
-aliases serve the published v5 UI. Close and reopen an existing panel first.
-The latest newly opened native panel still loaded the older cached UI, whose
-**Refresh** can clear the progress bar asynchronously. If that UI persists,
-the plugin connection or resource cache needs refreshing; native v5 acceptance
-remains pending an actual cache reload. The published and tested v5 UI follows
-the original job through bounded, cancellable saved job and request reads;
+shows connection, detected mode, packages and saved
+jobs. Its current resource is `ui://fm1/device-panel-v6.html`; the v1-v5
+aliases serve the published v6 UI. Native v6 rendering is accepted: a newly
+opened installed panel showed the actual FM1 on COM10 and applied Mint Light /
+Circuit Grid, reporting **Appearance saved on this browser**. The earlier v5 check loaded cached v4,
+whose **Refresh** cleared progress asynchronously; that is historical evidence.
+The published and tested UI follows
+the original job through bounded, cancellable saved job and request reads when
+host tools are available;
 its **Refresh** updates metadata and preserves selected progress.
 Read the dated verification record for the currently attached session and
 hardware acceptance; saved inventory does not prove current physical state.
 The app and panel icon use an original black/mint
 FM-1 silhouette based on the physical front-panel arrangement.
+
+The latest installed-host calls are unavailable despite active v6: native
+**Refresh** rejects `open_fm1_library` as outside its trusted tool scope, and a
+repeated assistant open returned **Unknown tool**. The cause and recovery are
+unconfirmed; reopening is not a verified fix. See
+[host availability issue #6](https://github.com/Keitark/fm1-marketplace-plugin/issues/6).
+
+The v6 Appearance controls were published on 2026-10-10 at 11:27 JST; native
+Mint Light / Circuit Grid rendering is verified in the
+[installed-panel screenshot](docs/images/fm1-native-appearance-mint-light.png).
+Native custom RGB / Dots and Reset also passed; the final
+[FM1 Mint / Circuit Grid screenshot](docs/images/fm1-native-appearance-final.png)
+shows the restored selection and all 12 choices. Persistence after reopening
+was tested only in the synthetic preview.
+SDK versions remain unchanged. The
+**Appearance** expander
+offers 12 palettes, five patterns (60 combinations), custom RGB background and
+accent colors, derived foreground/surface contrast, and **Reset to FM1 Mint**.
+Preferences are local, saved where host `localStorage` is allowed, with a
+visible fallback applying to this panel only. Changing appearance makes no
+external, server or hardware calls. See the
+[Appearance guide](docs/USER_GUIDE.md#appearance).
 
 Start with the [user guide](docs/USER_GUIDE.md) for plugin installation, browsing
 the connected metadata panel, planning, saved-job recovery, and progress interpretation.
@@ -79,16 +102,17 @@ node --test tools/jieli-wl82/test_remote_store.cjs
 ```
 
 The current checks passed **189 Python tests**, **62 focused relay tests**,
-**10 browser-store JavaScript tests**, and **84 Site tests**: 40 server, 40 UI,
-and 4 SDK tests. See [VERIFICATION.md](docs/VERIFICATION.md) for the dated
+**10 browser-store JavaScript tests**, and **100 Site tests**: 40 server, 52 UI,
+4 SDK, and 4 appearance-engine tests. See
+[VERIFICATION.md](docs/VERIFICATION.md) for the dated
 results, PowerShell checks, and live validation receipts.
 The Python suite includes relay validation, durable
 same-ID recovery, switch digest/expiry checks, credential filtering, and the
 offline exception fix: failed planning no longer creates an unknown device
 outcome that blocks later device operations.
 
-Site typechecking and the v5 production build passed; the published source is
-`7c2a46dd4719db0b415a2645db65e5f7b1288a3d`. Actual SDK Client 2.3.1
+Site typechecking and the v6 production build passed; the published source is
+`0ea345a93554ab5f65b5c2c38c77fa03a2d4e8d0`. Actual SDK Client 2.3.1
 negotiated modern `2026-07-28` and legacy `2025-11-25` protocols in memory.
 An earlier direct deployed client probe returned HTTP 401 and did not establish
 remote modern-protocol acceptance. The seven WebMCP tool contracts are covered
@@ -128,9 +152,9 @@ protected writer. Transport delivery and bridge job outcome remain distinct:
 a delivered response can contain a failed or unknown job, and interrupted
 submissions are inspected by their saved ID without resubmission.
 
-The installed plugin, v4 native panel, and metadata relay have live acceptance.
-Native v5 acceptance remains pending the cache reload above. The published v5
-UI preserves the original job ID across metadata refresh and a lost
+Native appearance rendering and earlier metadata round trips are recorded
+above; current host-tool availability is limited by issue #6. The tested UI
+preserves the original job ID across metadata refresh and a lost
 confirmation reply. Its tested automatic progress following uses only
 `get_fm1_job` and `get_fm1_request`; it never repeats a submission. Following
 stops on a terminal outcome, cancellation or its inspection limit;
