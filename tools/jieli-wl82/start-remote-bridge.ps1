@@ -117,13 +117,17 @@ $token = [IO.File]::ReadAllText($tokenFile).Trim()
 if ($token.Length -lt 32 -or $token -notmatch '^[\x21-\x7e]+$') { throw 'Existing token file is invalid; no token was replaced.' }
 # A protected flashing snapshot fixes C:\Python311\python.exe independently
 # of the unelevated bridge runtime; this script never changes that installation.
-& $runtime -c 'import sys,yaml,tqdm,crcmod,colorama,serial,Cryptodome; assert sys.version_info >= (3,11)'
+& $runtime -c 'import sys,yaml,tqdm,crcmod,colorama,serial; assert sys.version_info >= (3,11)'
 if ($LASTEXITCODE -ne 0) { throw 'Python 3.11+ dependencies unavailable; see requirements-remote.txt. Nothing was installed.' }
 $configFile = Join-Path $state 'launch.json'
 $oldConfig = $null
 if (Test-Path -LiteralPath $configFile) { $oldConfig = Get-Content -LiteralPath $configFile -Raw | ConvertFrom-Json }
 if (-not $PSBoundParameters.ContainsKey('SessionRoot') -and $oldConfig -and $oldConfig.session) {
     $SessionRoot = $oldConfig.session
+}
+if (-not $PSBoundParameters.ContainsKey('OfficialUpdater') -and -not $PSBoundParameters.ContainsKey('OfficialUpdaterSha256') -and $oldConfig) {
+    if ($oldConfig.PSObject.Properties['official_updater']) { $OfficialUpdater = $oldConfig.official_updater }
+    if ($oldConfig.PSObject.Properties['official_updater_sha256']) { $OfficialUpdaterSha256 = $oldConfig.official_updater_sha256 }
 }
 if ($SessionRoot) {
     $SessionRoot = (Resolve-Path -LiteralPath $SessionRoot).Path
@@ -220,7 +224,8 @@ if ($running) {
     $health = Get-BridgeHealth
     if (-not $health) { throw 'Recorded bridge PID is alive but authenticated health is unavailable. No duplicate was launched.' }
     if ($oldConfig -and ($oldConfig.session -ne $SessionRoot -or $oldConfig.port -ne $Port -or
-        $oldConfig.official_updater -ne $OfficialUpdater)) { throw 'Running bridge uses different launch settings; inspect it locally before restarting.' }
+        $oldConfig.official_updater -ne $OfficialUpdater -or
+        $oldConfig.official_updater_sha256 -ne $OfficialUpdaterSha256)) { throw 'Running bridge uses different launch settings; inspect it locally before restarting.' }
     Write-Output "Bridge already running, PID $($running.Id), loopback port $Port."
     if ($PublishTailscale) { Publish-Bridge }
     return

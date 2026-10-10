@@ -6,6 +6,66 @@ for this integration. The private [FM1 App Library website](https://fm1-app-libr
 is also available; sign in with the owner account when prompted. Both use the
 [black/mint FM-1 mark](../site/public/fm1-icon.png).
 
+## Progress and the latest NES switch (2026-10-10)
+
+The progress bar appears under **Saved requests & progress** when a job is
+selected. The updated UI follows the original job automatically through sector
+verification, full readback and startup. A full sector bar alone does not mean
+the entire operation has finished. Tracking pauses on connection loss, an
+unknown outcome, or its polling limit; **Inspect job** resumes that exact ID
+without submitting the firmware operation again.
+
+To load updated UI code, close the old FM1 panel and reopen the newest plugin
+card. **Refresh** updates device/catalog data; it does not reload the UI
+resource. Published v5 preserves selected progress. The freshly opened native
+panel still received cached v4 during the October 10 check, so reopening alone
+may not load v5 immediately. Wait for the host's metadata/resource cache to
+refresh, then reopen; a directly connected custom MCP plugin also has a
+[connection-level Refresh flow](https://developers.openai.com/plugins/deploy/connect-chatgpt).
+That flow differs from the panel's device-data button. Older saved request
+entries are delivery snapshots; use **Inspect job** for current device progress.
+
+The later NES switch `9067aa03ef7f4826b9f143722cb5635e` completed successfully:
+**96/96 sectors**, a matching full-image readback, and verified serial startup.
+The [saved switch result](evidence/fm1-nes-switch-20261010.json) records the
+actual operation. The device subsequently reported normal serial mode on
+**COM10**, with the protected session idle and unblocked. Screen, sound and
+physical controls still require bench acceptance; vendor SysEx transfer has
+not been tested.
+
+## Initial v4 setup acceptance (2026-10-10)
+
+The installed native **v4** panel works in Codex. **Refresh** shows **FM1 in
+UBOOT**, six ready app packages, and switching **Enabled**. The official updater
+is configured, with **Needs FM1 MIDI connection** because the connected device
+currently exposes UBOOT rather than its official MIDI interface. Both local
+switching and official-update capabilities were enabled deliberately after the
+protected session was validated; neither setting confirms an individual update.
+
+A NES review showed **auto → already_uboot** and the selected package digest.
+It was canceled without submitting a switch. NES **View plan** subsequently
+succeeded without device I/O. Its original request/job ID is
+`427b240eda7c4867b403aee8f8838682`; native inspection and the installed tool
+returned that same job with **96 planned sectors**, `blocked:false`, and
+candidate SHA-256
+`4d4da3ab34b643034ea91ddb670fd3556b737a05835ed77fced687eae6ad345c`.
+At that point, write completion, full readback and boot verification were false,
+and no candidate flash had been submitted. The later NES operation is recorded
+above. The
+[saved native plan response](evidence/fm1-v4-native-plan-20261010.json) records
+the installed tool's result.
+
+The local protected session now uses a frozen runtime, is idle/unblocked, and
+has no running loader or pending reset after the plan. Its current baseline
+came from two
+matching actual 1 MiB device reads; the original evidence is preserved. The
+relay retains its existing private state and credentials. See
+[SITE_RELAY.md](SITE_RELAY.md) for the dated paths, digests and process evidence.
+Vendor GUI transfer remains pending until the required official MIDI mode is
+available and its separate review is confirmed.
+
+![Native v4 dark panel showing UBOOT and ready app packages](images/fm1-native-panel-v4-live.png)
+
 ## Install the ChatGPT/Codex plugin
 
 Use **Install** or **Connect** on the offered **FM1 App Library** installation
@@ -13,20 +73,24 @@ card, then complete any sign-in prompts. If that offer is no longer visible,
 ask to reopen the installation offer for the provisioned plugin. There is no
 need to create another plugin or configure a local MCP server.
 
-The plugin advertises a sidebar entry and a conversation panel. On 2026-10-09,
+The plugin advertises a sidebar entry and a conversation panel. Historically, on 2026-10-09,
 the installed plugin's library, status, catalog, and saved-job tools were
-verified. The updated Site v3 panel renders in Codex with **FM1 on COM4** and
+verified. The then-current Site v3 panel rendered in Codex with **FM1 on COM4** and
 the black/mint interface. **Refresh** and exact saved-job inspection after
 the relay restart also passed in that native panel. No Chrome
 extension is required for this native plugin experience. The website can be
 opened independently of plugin installation.
 
-## Current bench state
+## Historical metadata bench state (2026-10-09, v3)
 
-Browse the five app cards: **NES, Doom, MDX, Buddha, and ProTracker**. The
-verified local relay is connected with switching **Disabled**. It reports six
-validated private package variants; all are currently blocked because the
-local bridge has no configured protected session or verified baseline.
+The following is the recorded metadata acceptance check. Use **Refresh** for
+the current session, update mode and enable flags; later setup does not turn
+these earlier observations into hardware acceptance.
+
+Browse the five app cards: **NES, Doom, MDX, Buddha, and ProTracker**. At that
+check, the local relay was connected with switching **Disabled**. It reported six
+validated private package variants; all were blocked because that bridge had
+no configured protected session or verified baseline at the time.
 
 Inventory reported COM4 and CDC/audio interfaces. This verifies metadata
 transport, not a device write or physical acceptance. A tested MDX **View plan**
@@ -45,12 +109,13 @@ describe supported apps rather than installed firmware.
 
 ## When the bench is ready
 
-The metadata bridge and outbound relay are already connected in the recorded
-setup. Before planning can succeed or switching can be enabled, the bench
-owner must prepare and verify the protected session and unit-specific
-baseline through the established bench workflow. The Site does not prepare
-that session. See [SITE_RELAY.md](SITE_RELAY.md) for connection and recovery
-details; preserve an existing listener and its state.
+The bridge, outbound relay, verified protected session and current baseline
+are connected in the 2026-10-10 accepted setup above. Use **Refresh** before
+reviewing a new operation; preserve the existing listener and its state.
+If the session or current baseline is unavailable later, the bench owner must
+restore the prerequisites through the established bench workflow. The Site
+does not prepare that session. See [SITE_RELAY.md](SITE_RELAY.md) for connection
+and recovery details.
 
 1. Click **Refresh** to load current inventory and package metadata.
 2. Choose a package variant on its app card. Check its **Ready/Blocked** state
@@ -77,6 +142,39 @@ job ID before submitting confirmation. If the confirmation reply is lost,
 use **Inspect job** with that ID before reviewing another switch; do not
 submit the operation again.
 
+## Choose the update route
+
+The **Auto** entry method chooses the protected app route from fresh passive
+inventory: one recognized CDC interface uses the existing serial entry flow;
+one UBOOT disk uses the already-in-UBOOT flow. An inventory error, duplicate
+devices, conflicting modes or a changed mode prevents submission. The approved
+catalog ID and package SHA-256 still identify the custom app to install.
+Auto does not convert an app bundle into an official firmware package.
+
+For official firmware, open its review and confirm the displayed executable
+SHA-256 yourself. The bench must separately enable official-update
+handoff and expose one recognized stock or OTA MIDI input/output pair. The
+confirmed action opens the locally configured M-UPGRADE GUI; select the correct
+official `.fwsc` there and complete the manufacturer workflow locally. The
+[manufacturer download page](https://www.m-vave.com/download) lists the generic
+[M-UPGRADE package](https://yms-file-store.oss-cn-hongkong.aliyuncs.com/software/pc/M-UPGRADE.zip)
+and [FM-1 V15 firmware](https://yms-file-store.oss-cn-hongkong.aliyuncs.com/software/firmware/FM-1.fwsc).
+The older FM1-specific bundle embeds V14, so use the reviewed generic updater
+for the external V15 package.
+
+A saved successful handoff means the GUI started. It does not establish a
+firmware transfer or verification. Keep its original job ID if any reply is
+lost. Handoff persistently blocks further device jobs because the old baseline
+may no longer describe the FM1. After official completion, the bench owner must
+establish a fresh protected session and verified current-unit baseline while
+preserving the previous state and receipts. There is no remote unblock or
+automatic retry. Direct SysEx writing is not implemented by this integration.
+
+Automatic mode selection and vendor handoff have offline contract coverage.
+The current native auto review and offline plan are accepted above. Vendor
+transfer and candidate physical acceptance must still be recorded separately
+for the connected unit.
+
 ## Read progress correctly
 
 **Bench connected** means the relay is responding. Package readiness means the
@@ -88,9 +186,10 @@ successful startup, screen output, sound, or working keys. An unknown device
 outcome needs inspection by the bench owner before another device operation.
 Physical acceptance remains a separate bench check.
 
-Site version 3 is deployed, and the updated native panel is accepted in Codex.
-The server also serves the current UI at the older v1/v2 resource URIs for
-installed-plugin compatibility. An older cached tool title can still appear;
+Site version 4 is deployed owner-private with MCP enabled, and the current
+native panel is accepted in Codex. The server also serves its UI at the older
+v1/v2/v3 resource URIs for installed-plugin compatibility. An older cached tool
+title can still appear;
 the verified panel itself shows the current interface. See
 [VERIFICATION.md](VERIFICATION.md) for the dated deployment, native panel,
 metadata, and hardware acceptance evidence.

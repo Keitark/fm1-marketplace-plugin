@@ -37,6 +37,8 @@ class FakeBridge:
         self.post_error = None
         self.get_error = None
         self.jobs = {}
+        self.post_status = "queued"
+        self.post_fields = {}
         self.metadata = {"engine": {"blocked_unknown": True}, "device": {"device_io": False}}
         self.catalog = {"apps": [{"profile": "nes", "variants": [
             {"id": "nes-test", "sha256": EXPECTED_SHA, "ready": True}]}]}
@@ -47,7 +49,7 @@ class FakeBridge:
         if self.hook is not None:
             self.hook(method, route, body)
         if method == "POST":
-            self.jobs[body["id"]] = envelope(body["id"])
+            self.jobs[body["id"]] = envelope(body["id"], self.post_status, **self.post_fields)
             if self.post_error is not None:
                 raise self.post_error
             return self.jobs[body["id"]]
@@ -422,6 +424,139 @@ class RelayTests(unittest.TestCase):
                                            expected_sha256=EXPECTED_SHA, **args))
         self.assertEqual(self.bridge.calls, [])
 
+    def test_auto_switch_preserves_approved_package_and_uses_fixed_bridge_route(self):
+        self.restart(allow_switch=True)
+        value = task("switch_app", catalog_id="nes-test", entry_method="auto",
+                     expected_sha256=EXPECTED_SHA, approval_expires=int(time.time()) + 120)
+        result = self.relay.handle_task(value)
+        self.assertEqual(result["status"], "succeeded")
+        self.assertEqual(self.bridge.calls, [("GET", "/v1/catalog", None),
+            ("POST", "/v1/jobs", {"id": value["id"], "operation": "switch_app",
+                "catalog_id": "nes-test", "entry_method": "auto"})])
+
+    def test_official_update_permission_is_independent_of_switch_permission(self):
+        for permissions in ({}, {"allow_switch": True}):
+            self.restart(**permissions)
+            value = task("official_updater", expected_sha256=EXPECTED_SHA,
+                         approval_expires=int(time.time()) + 120)
+            self.assertEqual(self.relay.handle_task(value), {"id": value["id"],
+                "status": "failed", "error": "official_update_disabled"})
+            self.assertEqual(self.bridge.calls, [])
+        self.restart(allow_official_update=True)
+        value = task("official_updater", expected_sha256=EXPECTED_SHA,
+                     approval_expires=int(time.time()) + 120)
+        self.assertEqual(self.relay.handle_task(value)["status"], "succeeded")
+        self.assertEqual(self.bridge.calls, [("POST", "/v1/jobs", {"id": value["id"],
+            "operation": "official_updater", "expected_sha256": EXPECTED_SHA})])
+        switch = task("switch_app", catalog_id="nes-test", entry_method="auto",
+                      expected_sha256=EXPECTED_SHA, approval_expires=int(time.time()) + 120)
+        self.assertEqual(self.relay.handle_task(switch)["error"], "switch_disabled")
+        self.assertEqual(len(self.bridge.calls), 1)
+
+    def test_official_task_requires_exact_digest_expiry_schema_before_journaling(self):
+        valid = {"expected_sha256": EXPECTED_SHA, "approval_expires": 100}
+        invalid = [{"approval_expires": 100}, {"expected_sha256": EXPECTED_SHA},
+            dict(valid, path="M-UPGRADE.exe"), dict(valid, catalog_id="nes-test"),
+            dict(valid, entry_method="auto")]
+        invalid.extend(dict(valid, expected_sha256=digest)
+                       for digest in (None, True, "invalid", "D" * 64, "d" * 63, "d" * 65))
+        invalid.extend(dict(valid, approval_expires=expiry)
+                       for expiry in (None, True, 100.5, "100", 0, 2 ** 53))
+        for arguments in invalid:
+            value = task("official_updater", **arguments)
+            with self.subTest(arguments=arguments), self.assertRaises(relay.RelayError):
+                self.relay.handle_task(value)
+            self.assertFalse(self.relay._path(value["id"]).exists())
+        self.assertEqual(self.bridge.calls, [])
+
+    def test_prepared_official_task_expiry_prevents_submission_after_restart(self):
+        value = task("official_updater", expected_sha256=EXPECTED_SHA, approval_expires=100)
+        self.relay._prepare(value)
+        self.restart(allow_official_update=True)
+        with patch.object(relay.time, "time", return_value=100):
+            result = self.relay.handle_task(value)
+        self.assertEqual(result["error"], "approval_expired")
+        self.assertEqual(self.bridge.calls, [])
+
+    def test_official_approval_is_rechecked_immediately_before_submission(self):
+        self.restart(allow_official_update=True)
+        value = task("official_updater", expected_sha256=EXPECTED_SHA, approval_expires=100)
+        with patch.object(relay.time, "time", side_effect=[99, 100]):
+            result = self.relay.handle_task(value)
+        self.assertEqual(result["error"], "approval_expired")
+        self.assertEqual(self.bridge.calls, [])
+
+    def test_official_handoff_receipt_survives_duplicate_and_lost_site_ack_restart(self):
+        self.restart(allow_official_update=True)
+        self.bridge.post_status = "succeeded"
+        self.bridge.post_fields = {"operation": "official_updater", "result": {
+            "handoff": True, "written_verified": False, "sha256": EXPECTED_SHA}}
+        value = task("official_updater", expected_sha256=EXPECTED_SHA,
+                     approval_expires=int(time.time()) + 120)
+        def inspect(method, route, body):
+            record = self.relay._load(value["id"])
+            self.assertEqual(record["phase"], "executing")
+            self.assertEqual(record["task"], value)
+        self.bridge.hook = inspect
+        result = self.relay.handle_task(value)
+        self.assertTrue(result["data"]["result"]["handoff"])
+        self.assertFalse(result["data"]["result"]["written_verified"])
+        self.site.result_error = relay.RelayError("network_unavailable")
+        with self.assertRaises(relay.RelayError):
+            self.relay.report(result)
+        self.site.result_error = None
+        self.bridge.hook = None
+        self.restart()
+        self.assertEqual(self.relay.handle_task(value), result)
+        self.relay.run_once()
+        self.assertTrue(self.relay._load(value["id"])["reported"])
+        self.assertEqual(len(self.bridge.calls), 1)
+        reports = [body for _, route, body in self.site.calls if route == "/relay/result"]
+        self.assertEqual(reports, [result, result])
+
+    def test_official_lost_submission_queries_original_id_and_never_reposts(self):
+        self.restart(allow_official_update=True)
+        self.bridge.post_error = relay.RelayError("network_unavailable")
+        self.bridge.post_status = "succeeded"
+        self.bridge.post_fields = {"result": {"handoff": True, "written_verified": False}}
+        value = task("official_updater", expected_sha256=EXPECTED_SHA,
+                     approval_expires=int(time.time()) + 120)
+        result = self.relay.handle_task(value)
+        self.assertTrue(result["data"]["result"]["handoff"])
+        self.restart()
+        self.assertEqual(self.relay.handle_task(value), result)
+        self.assertEqual([(method, route) for method, route, _ in self.bridge.calls],
+            [("POST", "/v1/jobs"), ("GET", "/v1/jobs/" + value["id"])])
+
+    def test_executing_official_task_recovers_even_if_disabled_and_expired(self):
+        value = task("official_updater", expected_sha256=EXPECTED_SHA, approval_expires=100)
+        self.relay._prepare(value)
+        record = self.relay._load(value["id"])
+        record["phase"] = "executing"
+        relay.atomic_json(self.relay._path(value["id"]), record)
+        self.bridge.jobs[value["id"]] = envelope(value["id"], "succeeded",
+            result={"handoff": True, "written_verified": False})
+        self.restart()
+        result = self.relay.handle_task(value)
+        self.assertTrue(result["data"]["result"]["handoff"])
+        self.assertEqual(self.bridge.calls, [("GET", "/v1/jobs/" + value["id"], None)])
+
+    def test_official_unknown_receipt_and_changed_digest_never_allow_resubmission(self):
+        self.restart(allow_official_update=True)
+        self.bridge.post_error = relay.RelayError("network_unavailable")
+        self.bridge.get_error = relay.RelayError("http_rejected", 404)
+        value = task("official_updater", expected_sha256=EXPECTED_SHA,
+                     approval_expires=int(time.time()) + 120)
+        result = self.relay.handle_task(value)
+        self.assertEqual(result["status"], "unknown")
+        self.restart(allow_official_update=True)
+        self.assertEqual(self.relay.handle_task(value), result)
+        changed = task("official_updater", identifier=value["id"], expected_sha256="d" * 64,
+                       approval_expires=value["arguments"]["approval_expires"])
+        with self.assertRaisesRegex(relay.RelayError, "task_id_conflict"):
+            self.relay.handle_task(changed)
+        self.assertEqual(len(self.bridge.calls), 2)
+
     def test_metadata_projection_has_journal_headroom_and_stable_cached_receipt(self):
         self.bridge.metadata = {"id": "d" * 32, "status": "unknown",
             "engine": {"blocked_unknown": True, "unknown_jobs": [uuid.uuid4().hex for _ in range(400)]},
@@ -681,8 +816,16 @@ class RelayTests(unittest.TestCase):
 
     def test_idle_heartbeat_reports_switch_disabled_without_bridge_io(self):
         self.assertEqual(self.relay.run_once(), 0)
-        self.assertEqual(self.site.calls, [("POST", "/relay/heartbeat", {"allow_switch": False}),
+        self.assertEqual(self.site.calls, [("POST", "/relay/heartbeat", {
+            "allow_switch": False, "allow_official_update": False}),
                                           ("POST", "/relay/poll", {})])
+        self.assertEqual(self.bridge.calls, [])
+
+    def test_heartbeat_reports_independent_deliberate_official_update_enable(self):
+        self.restart(allow_official_update=True)
+        self.relay.run_once()
+        self.assertEqual(self.site.calls[0], ("POST", "/relay/heartbeat", {
+            "allow_switch": False, "allow_official_update": True}))
         self.assertEqual(self.bridge.calls, [])
 
     def test_poll_validation_happens_before_any_bridge_call(self):
@@ -834,6 +977,19 @@ class HttpTransportTests(unittest.TestCase):
         with patch.object(relay, "load_token", side_effect=relay.RelayError("credential_unavailable")), patch("sys.stderr", output):
             self.assertEqual(relay.main(["--site-url", "https://fm1.example", "--state-dir", "unused"]), 1)
         self.assertEqual(output.getvalue(), "FM1 relay: credential_unavailable\n")
+
+    def test_main_official_update_flag_enables_only_its_heartbeat_capability(self):
+        site, bridge = FakeSite(), FakeBridge()
+        def factory(origin, headers):
+            return site if origin == "https://fm1.example" else bridge
+        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {
+                "FM1_RELAY_TOKEN": RELAY_TOKEN, "FM1_SITES_SERVICE_TOKEN": SITES_TOKEN,
+                "FM1_BRIDGE_TOKEN": BRIDGE_TOKEN}), patch.object(relay, "JsonClient", factory):
+            self.assertEqual(relay.main(["--site-url", "https://fm1.example", "--state-dir", folder,
+                "--allow-official-update", "--once"]), 0)
+        self.assertEqual(site.calls[0], ("POST", "/relay/heartbeat", {
+            "allow_switch": False, "allow_official_update": True}))
+        self.assertEqual(bridge.calls, [])
 
 
 if __name__ == "__main__":

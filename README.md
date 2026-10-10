@@ -7,19 +7,34 @@ The implementation includes the existing browser store/bridge, a Sites Worker
 with HTTP MCP at `/mcp`, a durable D1 request queue, an MCP App library panel,
 global/thread extension metadata, WebMCP registration, and an outbound Windows
 relay. The relay keeps the existing authenticated bridge and protected writer
-local. Version 3 is privately deployed with pinned server SDK 2.3.1 and
-ext-apps 2.0.3. Local tests/build, live metadata transport, and rendering the
-updated native Codex panel passed. Physical bench acceptance remains separate.
+local. Version 5 is privately deployed, displays server version 2.1.1, and pins
+server SDK 2.3.1 and ext-apps 2.0.3. It detects serial, UBOOT and official
+MIDI/SysEx modes, selects
+the protected app route automatically, and provides a reviewed handoff to the
+pinned official Windows updater. Firmware writes still require human confirmation.
+Local tests/build, protected runtime setup, verified readback adoption and the
+native offline plan passed. The user-confirmed NES switch completed on
+2026-10-10 at 10:38 JST with 96/96 sectors, full readback and serial startup
+verified. Subsequent inventory reported COM10 in normal serial mode and the
+session idle/unblocked. Physical screen/audio/control acceptance remains
+pending (`physical_acceptance:false`); official MIDI/SysEx transfer is untested.
+The [saved switch response](docs/evidence/fm1-nes-switch-20261010.json) retains
+the original job `9067aa03ef7f4826b9f143722cb5635e`.
 See [VERIFICATION.md](docs/VERIFICATION.md).
 
 The owner-private [FM1 App Library](https://fm1-app-library.keitark.chatgpt.site)
 is deployed and MCP-ready, and its plugin is installed. The native Codex panel
-now renders the updated black/mint interface with **FM1 on COM4**. Native
-Refresh and exact saved-job inspection after the relay restart passed. Its current
-resource is `ui://fm1/device-panel-v3.html`; the v1/v2 resource aliases serve the
-same current UI. A cached tool title may remain older. Local inventory reports
-COM4 and six blocked private
-packages; switching is disabled and no protected session is configured.
+uses the black/mint interface with connection, detected mode, packages and saved
+jobs. Its current resource is `ui://fm1/device-panel-v5.html`; the v1-v4
+aliases serve the published v5 UI. Close and reopen an existing panel first.
+The latest newly opened native panel still loaded the older cached UI, whose
+**Refresh** can clear the progress bar asynchronously. If that UI persists,
+the plugin connection or resource cache needs refreshing; native v5 acceptance
+remains pending an actual cache reload. The published and tested v5 UI follows
+the original job through bounded, cancellable saved job and request reads;
+its **Refresh** updates metadata and preserves selected progress.
+Read the dated verification record for the currently attached session and
+hardware acceptance; saved inventory does not prove current physical state.
 The app and panel icon use an original black/mint
 FM-1 silhouette based on the physical front-panel arrangement.
 
@@ -33,6 +48,7 @@ the connected metadata panel, planning, saved-job recovery, and progress interpr
 - `tools/jieli-wl82/remote_store.html`: app library, package selection, write confirmation, and job progress.
 - `remote_bridge.py`: loopback HTTP service, authenticated fixed operations, durable jobs, and uncertainty handling.
 - `remote_backend.py` and `flash-session-client.ps1`: adapter to an existing protected Windows flashing session.
+- `update_mode.py`: passive serial/disk/MIDI classification without opening an endpoint or transmitting SysEx.
 - `remote_catalog.py`: immutable private package validation and device-baseline matching.
 - `remote_client.py`: CLI with credential origin restrictions and no automatic job resubmission.
 - `job_progress.py`: progress from persisted job/session metadata.
@@ -62,8 +78,8 @@ python -m unittest discover -s tools/jieli-wl82 -p 'test_*.py'
 node --test tools/jieli-wl82/test_remote_store.cjs
 ```
 
-The current checks passed **150 Python tests**, **51 focused relay tests**,
-**10 browser-store JavaScript tests**, and **45 Site tests**: 26 server, 15 UI,
+The current checks passed **189 Python tests**, **62 focused relay tests**,
+**10 browser-store JavaScript tests**, and **84 Site tests**: 40 server, 40 UI,
 and 4 SDK tests. See [VERIFICATION.md](docs/VERIFICATION.md) for the dated
 results, PowerShell checks, and live validation receipts.
 The Python suite includes relay validation, durable
@@ -71,12 +87,13 @@ same-ID recovery, switch digest/expiry checks, credential filtering, and the
 offline exception fix: failed planning no longer creates an unknown device
 outcome that blocks later device operations.
 
-Site typechecking and the v3 production build passed. Actual SDK Client 2.3.1
+Site typechecking and the v5 production build passed; the published source is
+`7c2a46dd4719db0b415a2645db65e5f7b1288a3d`. Actual SDK Client 2.3.1
 negotiated modern `2026-07-28` and legacy `2025-11-25` protocols in memory.
 An earlier direct deployed client probe returned HTTP 401 and did not establish
-remote modern-protocol acceptance. All six WebMCP tools were
-discovered and verified in a supported browser using a local synthetic HTTP
-relay; malformed input was rejected for every tool. See [WEBMCP.md](docs/WEBMCP.md).
+remote modern-protocol acceptance. The seven WebMCP tool contracts are covered
+by the Site tests; the earlier six-tool release was also checked in a supported
+browser against a synthetic HTTP relay. See [WEBMCP.md](docs/WEBMCP.md).
 
 ## Local operation
 
@@ -89,7 +106,9 @@ Do not start a duplicate bridge over an existing listener or redirect its state 
 ## Site and plugin operation
 
 The Site offers catalog and inventory refresh, offline app plans, saved
-request/job inspection, and app-switch review. The MCP panel uses server tools
+request/job inspection, automatic app-switch review, and official SysEx updater
+review. The latter opens the pinned manufacturer's tool for an official `.fwsc`
+package; it does not report a completed update from a GUI launch. The MCP panel uses server tools
 through its host bridge. The full website separately feature-detects
 `document.modelContext.registerTool`; normal library controls remain available
 when WebMCP is unavailable. The panel does not embed the loopback store.
@@ -109,10 +128,14 @@ protected writer. Transport delivery and bridge job outcome remain distinct:
 a delivered response can contain a failed or unknown job, and interrupted
 submissions are inspected by their saved ID without resubmission.
 
-The installed plugin, updated native panel, and metadata relay have live
-acceptance. The panel preserves the original job ID across metadata refresh
-and a lost confirmation reply; inspect that exact ID before any further
-operation. Relay metadata is bounded to 58,000 serialized bytes, with durable
+The installed plugin, v4 native panel, and metadata relay have live acceptance.
+Native v5 acceptance remains pending the cache reload above. The published v5
+UI preserves the original job ID across metadata refresh and a lost
+confirmation reply. Its tested automatic progress following uses only
+`get_fm1_job` and `get_fm1_request`; it never repeats a submission. Following
+stops on a terminal outcome, cancellation or its inspection limit;
+**Inspect job** resumes that exact ID. Relay metadata is bounded to 58,000
+serialized bytes, with durable
 receipt recovery for proven oversize rejections. Device writes and
 physical screen/audio/control acceptance require
 the established bench prerequisites and an explicitly confirmed operation.

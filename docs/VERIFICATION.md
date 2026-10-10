@@ -1,7 +1,114 @@
 # Integration verification
 
+## Subsequent NES programming and progress correction, 2026-10-10
+
+The saved switch job `9067aa03ef7f4826b9f143722cb5635e` completed at
+10:38 JST. Installed-tool inspection request
+`096c7f619cc44de69e1bc3c00d0f9d07` returned authoritative `status:succeeded`,
+`result.ok:true`, 96/96 verified sectors, `write_complete:true`,
+`full_readback_verified:true` and `boot_verified:true`. Its full-image readback
+SHA-256 matches NES candidate
+`4d4da3ab34b643034ea91ddb670fd3556b737a05835ed77fced687eae6ad345c`.
+The retained [actual switch response](evidence/fm1-nes-switch-20261010.json)
+distinguishes the physical write from the earlier offline plan. Startup evidence
+is serial identification and advancing counters; `physical_acceptance:false`
+and the display/audio/control bench boundary remain explicit.
+
+Fresh status request `af69f2586c3647d89153631e511d6eee` reported normal serial
+mode on COM10, an idle/unblocked protected session without a running loader or
+pending reset, and two succeeded jobs alongside the three retained failed plans.
+No write was repeated while inspecting or correcting the UI.
+
+The previous UI stopped after delivery succeeded, leaving the submitted job's
+queued snapshot on screen. The correction follows the exact saved bridge job
+with read-only inspection until its authoritative terminal state. It preserves
+progress during Refresh, cancels obsolete/teardown work, bounds polling, and
+stops on delivery or connection uncertainty. Missing counts do not invent a
+percentage. Plans, writes and confirmations are never automatically resubmitted.
+All **84 Site tests passed** (40 server, 40 UI, 4 SDK), including 15 new progress
+regressions and both protocol variants with v1/v2/v3/v4 resource compatibility.
+
+Typechecking and the production build passed. The source workflow packaged
+and pushed `7c2a46dd4719db0b415a2645db65e5f7b1288a3d`; private deployment
+`appgdep_6ac99af9c4f08191b1207fe174a0fa88` succeeded at 10:56 JST with MCP enabled
+and environment revision 1. Site v5 advertises server version `2.1.1` and
+`ui://fm1/device-panel-v5.html`, retaining v1/v2/v3/v4 aliases. SDK pins remain
+server `2.3.1` and ext-apps `2.0.3`.
+
+The newly opened native panel still loaded the prior v4 application script:
+14,957 characters without `selectedWork` or `followJob`, rather than v5's
+18,502-character script containing both. A separate background check of the
+live Site confirmed that it serves the new 18,502-character application script
+with automatic tracking and the metadata-preservation guard. Native **Inspect job** displayed the
+actual NES result and 96/96 sector bar, but the old UI hid it after metadata
+Refresh completed. This accepts saved-job inspection, not the v5 automatic
+progress loop in the live native host. Native v5 acceptance remains pending
+resource-cache refresh. OpenAI documents [UI resources as cache keys](https://developers.openai.com/plugins/build/chatgpt-ui)
+and [continuous tool review and resource caching](https://developers.openai.com/plugins/deploy/app-review);
+ChatGPT may retain compatible resource contents for up to an hour. Reopening
+alone did not bypass the cache in this observed Codex panel.
+
+![Cached native panel displaying the actual completed NES job and sector bar](images/fm1-native-panel-cached-progress-20261010.png)
+
+## Initial setup update, 2026-10-10
+
+- 189 Python tests passed in 36.368 seconds; these include 62 relay tests,
+  passive mode detection, route/identity revalidation, pinned updater handoff,
+  and durable recovery with the original job ID.
+- 10 store JavaScript tests and 69 Site tests passed (40 server, 25 UI, 4 SDK).
+  The Site tests include native confirmation, engine latches, official approval
+  digest/expiry/atomicity, automatic routes and v1/v2/v3 resource aliases.
+- All three integration PowerShell launchers/clients parse. Typechecking and
+  the production build passed with the pinned SDKs.
+- Site v4 source `bd87d14a039b8ef5233a6b3c60291c3642ee7f98` was packaged by
+  the source workflow and privately deployed as
+  `appgdep_6ac9903cd9e08191b5df920575373d1e`; deployment succeeded with MCP enabled.
+  The installed plugin's library read succeeded after deployment.
+- The separately prepared protected helper passed its live frozen-runtime
+  parent/child proof. Serial identified MDX Karaoke; a guarded UBOOT transition
+  and two identical complete 1 MiB readbacks completed. No flash-array program
+  or erase command was sent. The readback matches the MDX RayForce catalog image
+  and differs from the historical seed baseline. The source protected receipt
+  and both images are preserved. The stopped source was then migrated into a
+  new protected frozen-runtime session; its fresh double-read baseline and
+  original evidence remain separate, with the target identity guard retained.
+  After the user's power cycle, the supported serial-to-UBOOT transition passed.
+  The replacement helper is idle and unblocked, without a running RAM loader or
+  pending reset. The bridge and relay now use this session and retain their
+  existing credentials and saved job history.
+- The actual native MCP App panel renders the black/mint v4 UI. Refresh returned
+  `FM1 in UBOOT`, switching enabled, and all six packages ready. NES review
+  selected `auto -> already_uboot`; it was cancelled without submitting a write.
+  The official updater is configured, while its review control correctly says
+  `Needs FM1 MIDI connection` in this UBOOT state.
+- Native `View plan` created NES job `427b240eda7c4867b403aee8f8838682`.
+  `Inspect job` reused that exact ID through request
+  `ea27707a4bb04f428aef9d4729b21f1e`. Both the native panel and installed plugin
+  request tool returned authoritative `status:succeeded`, `result.ok:true`,
+  `device_io:false`, `blocked:false`, 96 planned sectors, and the reviewed
+  package SHA-256
+  `4d4da3ab34b643034ea91ddb670fd3556b737a05835ed77fced687eae6ad345c`.
+  Write, full-readback and boot-verification progress remained false. This
+  resolves the historical missing-session plan prerequisite without claiming
+  firmware programming or physical startup acceptance.
+  The installed tool's saved response is retained in
+  [the native plan evidence](evidence/fm1-v4-native-plan-20261010.json).
+- Integration GitHub CI passed both the offline bridge/store and Site contract
+  build jobs on source checkpoint `123c492` (run `38012265242`). The separate
+  runtime checkpoint `47a43f2` passed 99 focused tests, including the actual
+  copied interpreter and named pipes. One absent private profile fixture was
+  excluded, and the full private writer fixture suite was not run.
+- Generic M-UPGRADE was downloaded from the manufacturer; its executable hash
+  and external `.fwsc` chooser were checked statically with its full Qt closure.
+  The official MIDI/SysEx transfer and physical write/startup acceptance remain
+  untested on this device. GUI handoff is never treated as verified programming.
+
+![Native v4 plugin, current UBOOT route and ready packages](images/fm1-native-panel-v4-live.png)
+
+## Historical release, 2026-10-09
+
 The checks below were recorded on 2026-10-09 using Python 3.11.0 and
-Node.js v22.22.2 on Windows. Current Site version 3, the final offline suite,
+Node.js v22.22.2 on Windows. Site version 3, that release's final offline suite,
 and actual native-panel acceptance are recorded below. Earlier import and
 version 2 observations remain historical evidence.
 Offline checks started no live bridge,

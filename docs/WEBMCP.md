@@ -1,17 +1,29 @@
 # Native MCP App panel and browser tools
 
 The installed FM1 plugin and native MCP App panel are the user's primary
-interface. On 2026-10-09, native library/status/catalog/saved-job tools and panel
-Refresh succeeded through the authenticated local relay. After Site v3
-deployment, the actual Codex MCP App panel renders the updated black/mint UI
-with **FM1 on COM4**. Older installed descriptors can read that current UI
-through compatibility resource aliases.
-Native Refresh and exact saved-job inspection after the relay restart also
-passed in this updated panel, verifying the deployed MCP Apps SDK host bridge.
+interface. Site v5 is privately deployed with resource
+`ui://fm1/device-panel-v5.html` and v1-v4 compatibility aliases. Close and reopen
+an existing panel first. The latest newly opened native panel still loaded the
+older cached UI: its script was 14,957 characters and lacked `selectedWork` and
+`followJob`, and **Refresh** cleared the progress bar asynchronously. If that UI
+persists, the plugin connection or resource cache needs refreshing. Native v5
+acceptance remains pending an actual cache reload. The published and tested
+v5 UI follows the exact original job through bounded, cancellable read-only
+inspection; its **Refresh** updates metadata while preserving selected progress.
+
+The user-confirmed NES switch completed on 2026-10-10 at 10:38 JST under job
+`9067aa03ef7f4826b9f143722cb5635e`, with 96/96 sectors, full readback and serial
+startup verified. Subsequent inventory reported COM10 in normal serial mode
+and the protected session idle/unblocked. The
+[saved switch response](evidence/fm1-nes-switch-20261010.json) retains the
+authoritative result. Physical screen/audio/control acceptance remains pending
+(`physical_acceptance:false`), and official MIDI/SysEx transfer is untested.
+The earlier v4 UBOOT rendering, canceled review and offline plan are dated
+evidence in [VERIFICATION.md](VERIFICATION.md).
 The full website's WebMCP tools are an additional interface; native plugin use
 requires no Chrome extension.
 
-The top-level FM1 Site registers six tools through
+The top-level FM1 Site registers seven tools through
 `document.modelContext.registerTool` when the in-app browser supports WebMCP.
 They share the visible library's actions and state. Unsupported browsers keep
 the ordinary controls. Registration uses an `AbortSignal` and is removed when
@@ -31,13 +43,16 @@ match `^[a-f0-9]{32}$`.
 | `plan_fm1_app` | `{catalog_id}` | Submit an offline plan and show its saved outcome. |
 | `inspect_fm1_request` | `{request_id}` | Read the original request's saved delivery and job outcome. |
 | `inspect_fm1_job` | `{job_id}` | Inspect the original bridge job and display its result; never resubmit it. |
-| `start_fm1_switch_review` | `{catalog_id,entry_method}` | Open human review; `entry_method` is `serial` or `already_uboot`. No device write is submitted. |
+| `start_fm1_switch_review` | `{catalog_id,entry_method}` | Open human review; `entry_method` is `auto`, `serial` or `already_uboot`. Automatic selection is rechecked locally before device operations. No device write is submitted. |
+| `start_fm1_official_update_review` | `{}` | Review the pinned official Windows SysEx updater. No updater launch or firmware transfer is submitted. |
 
 There is no WebMCP confirmation tool. Review returns package identity and
 SHA-256 but never the approval nonce. Cancel or Escape clears the displayed
 approval. Final confirmation requires a trusted click on the visible control,
 the server's owner-bound one-use approval, and deliberate local switching
-enablement. See [the relay contract](SITE_RELAY.md) for delivery, digest, expiry,
+enablement. Official updater review uses a separate local capability and binds
+the executable SHA-256. Its human confirmation opens the vendor tool; completion
+remains in that tool. See [the relay contract](SITE_RELAY.md) for delivery, digest, expiry,
 and uncertainty handling.
 
 ## Native panel and SDK migration
@@ -54,23 +69,34 @@ result can still render without that capability. The iframe acknowledges
 `ui/resource-teardown`, aborts its lifecycle, clears approval state, and rejects
 pending requests. Page closure performs the same cleanup.
 
-Site version **3** pins **ext-apps 2.0.3** and official server SDK **2.3.1**.
-The current 45 Site tests, typecheck, production build, and private deployment
-passed. Actual SDK Client 2.3.1 negotiated **2026-07-28** and legacy
-**2025-11-25** protocols in memory. The new native UI resource is
-`ui://fm1/device-panel-v3.html`. Tool descriptors advertise that URI; reads of
-`ui://fm1/app-library-v1.html` and `ui://fm1/device-panel-v2.html` return the same
-current HTML with identical metadata and CSP. Both modern and legacy SDK
-integration tests verify these reads.
+The Site pins **ext-apps 2.0.3** and official server SDK **2.3.1**.
+The current resource is `ui://fm1/device-panel-v5.html`; v1-v4 aliases
+serve the same current panel. The ten MCP tools include two app-only confirmation
+tools. See [VERIFICATION.md](VERIFICATION.md) for dated deployment evidence.
+The v5 release displays server version **2.1.1** and published source
+`7c2a46dd4719db0b415a2645db65e5f7b1288a3d`. It passed **84 Site tests**
+(40 server, 40 UI, 4 SDK), typechecking, production build and private deployment.
+Actual SDK Client 2.3.1 negotiated **2026-07-28** and legacy
+**2025-11-25** protocols in memory. Both protocol variants verify the current
+resource and compatibility reads with identical HTML, metadata and CSP.
+The historical v4 release used `ui://fm1/device-panel-v4.html` and passed
+69 Site tests; its initial native acceptance remains in the verification guide.
+The historical v3 release used `ui://fm1/device-panel-v3.html` and passed
+45 Site tests; its dated acceptance remains in the verification guide.
 
-The actual native Codex panel now renders the updated UI, although a cached
-tool title may remain older. The UI preserves the original job ID across
-metadata refresh and a lost confirmation reply. Saved-job inspection always
-targets that exact ID and does not resubmit a plan or switch. An earlier direct
+The native v4 Codex panel rendered the black/mint UI; the latest new panel still
+loaded the older cached resource as recorded above. The published v5 UI
+preserves the original job ID across
+metadata refresh and a lost confirmation reply. Automatic following uses only
+`get_fm1_job` and `get_fm1_request`, checks the returned job identity, and stops
+on terminal outcomes, cancellation, offline/error conditions or its inspection limit.
+Teardown cancels pending reads, and a superseding inspection cannot display an
+older job's late response. **Inspect job** resumes the saved original ID without
+resubmitting a plan or switch. An earlier direct
 deployed SDK Client probe using the relay service credential returned HTTP 401;
 that probe did not verify remote modern-protocol negotiation.
 
-## Verification recorded on 2026-10-09
+## Historical verification recorded on 2026-10-09
 
 The installed native plugin's open/status/catalog/job calls succeeded, and
 Refresh worked in the actual native MCP App iframe. Live Site WebMCP Refresh
@@ -86,7 +112,7 @@ After the v3 deployment, native Refresh succeeded and preserved the original
 job ID in the recovery field. After restarting the relay with its existing
 state, native **Inspect job** returned the same original MDX job with its
 authoritative protected-session prerequisite failure. These checks establish
-current native rendering and host-proxied calls without resubmitting the job.
+that release's native rendering and host-proxied calls without resubmitting the job.
 Exact request IDs and deployment receipts are in
 [VERIFICATION.md](VERIFICATION.md).
 
@@ -102,7 +128,9 @@ browser's Confirm control was not clicked. A local SQLite read after stopping
 the fixture confirmed zero queued `switch_app` tasks; no device writes were
 performed.
 
-The current **15 formal UI tests** in `site/test/ui.test.mjs` passed. They cover initial
+## Current contract checks (2026-10-10)
+
+The current **40 formal UI tests** in `site/test/ui.test.mjs` passed. They cover initial
 render without duplicate requests, initial render without `serverTools`,
 fallback, teardown, registry abort, nonce-free review, untrusted confirmation
 rejection, Cancel/Escape, one-use trusted confirmation, awaited job inspection,
@@ -111,6 +139,13 @@ port and no duplicate refresh. Additional recovery checks preserve the job ID
 through refresh and a lost confirmation reply, and select the exact job ID
 for WebMCP inspection without resubmission. The trusted-click test is a VM fixture, not a
 physical browser or hardware operation.
+The v4 additions cover auto routing, official updater review, engine latches,
+capability availability and preservation of the original official handoff ID.
+The v5 additions cover automatic plan/switch progress, exact-ID recovery,
+metadata Refresh preserving progress, failed/unknown outcomes, indeterminate
+totals, offline and lost delivery, bounded follow loops, shared repeated
+inspection, superseding results, teardown, identity mismatch and vendor
+handoff without a transfer-completion claim.
 
 ## Repeat the local fixture
 
@@ -135,7 +170,7 @@ installed dependencies. Do not use a deployed Site or real bridge credentials.
    node test/browser-fixture.mjs http://127.0.0.1:3000
    ```
 
-4. Open the local URL in an in-app browser that exposes WebMCP. Discover the six
+4. Open the local URL in an in-app browser that exposes WebMCP. Discover the seven
    tools, exercise the valid and malformed cases above, and read back the UI
    state. Use the synthetic `nes-test` package for planning/review and Cancel
    the review. Stop the fixture and local Worker afterward.

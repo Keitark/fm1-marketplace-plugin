@@ -3,10 +3,11 @@ import hashlib
 import io
 import json
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from urllib.error import URLError
 
 from remote_client import Client, NoRedirect
+import remote_client
 
 TOKEN = 'test-only-token-that-is-at-least-32-characters'
 
@@ -63,6 +64,53 @@ class ClientTests(unittest.TestCase):
         client.opener.open.return_value = Response(json.dumps({'ok': True, 'data': job}).encode())
         self.assertEqual(client.wait('a'*32, 1), job)
         self.assertEqual(client.opener.open.call_count, 1)
+
+    def test_unknown_official_job_is_inspected_without_resubmission(self):
+        saved = {'id': 'a' * 32, 'operation': 'official_updater', 'status': 'unknown'}
+        client = Client('http://127.0.0.1:9770', TOKEN)
+        client.opener = Mock()
+        client.opener.open.return_value = Response(json.dumps({'ok': True, 'data': saved}).encode())
+        self.assertEqual(client.wait(saved['id'], 1), saved)
+        self.assertEqual(client.opener.open.call_count, 1)
+        request = client.opener.open.call_args.args[0]
+        self.assertEqual(request.get_method(), 'GET')
+        self.assertTrue(request.full_url.endswith('/v1/jobs/' + saved['id']))
+        self.assertIsNone(request.data)
+
+    def test_official_updater_cli_keeps_the_reviewed_hash_and_explicit_job_id(self):
+        identifier, digest = 'e' * 32, '1a' * 32
+        client = Mock()
+        client.call.return_value = {'id': identifier, 'status': 'queued'}
+        arguments = ['remote_client.py', '--url', 'http://127.0.0.1:9770',
+                     '--token-file', 'offline.token', 'job', 'official_updater',
+                     '--id', identifier, '--expected-sha256', digest]
+        with patch('sys.argv', arguments), patch('remote_client.Path.read_text', return_value=TOKEN), \
+                patch('remote_client.Client', return_value=client), \
+                patch('sys.stdout', new_callable=io.StringIO), patch('sys.stderr', new_callable=io.StringIO):
+            self.assertEqual(remote_client.main(), 0)
+        client.call.assert_called_once_with('/v1/jobs', {'id': identifier,
+                                                       'operation': 'official_updater',
+                                                       'expected_sha256': digest})
+        client.wait.assert_not_called()
+
+    def test_auto_switch_cli_lost_reply_preserves_id_without_retry_or_wait(self):
+        identifier = 'f' * 32
+        client = Mock()
+        client.call.side_effect = URLError('submission reply lost')
+        arguments = ['remote_client.py', '--url', 'http://127.0.0.1:9770',
+                     '--token-file', 'offline.token', 'job', 'switch_app',
+                     '--id', identifier, '--catalog-id', 'nes-test',
+                     '--entry-method', 'auto', '--wait']
+        with patch('sys.argv', arguments), patch('remote_client.Path.read_text', return_value=TOKEN), \
+                patch('remote_client.Client', return_value=client), \
+                patch('sys.stdout', new_callable=io.StringIO), \
+                patch('sys.stderr', new_callable=io.StringIO) as error_output:
+            with self.assertRaises(URLError):
+                remote_client.main()
+            self.assertIn('Job id: ' + identifier, error_output.getvalue())
+        client.call.assert_called_once_with('/v1/jobs', {'id': identifier, 'operation': 'switch_app',
+                                                       'catalog_id': 'nes-test', 'entry_method': 'auto'})
+        client.wait.assert_not_called()
 
 
 if __name__ == '__main__':

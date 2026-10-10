@@ -31,8 +31,8 @@ MAX_METADATA_BYTES = 58_000
 ID = re.compile(r"[0-9a-f]{32}\Z")
 SHA = re.compile(r"[0-9a-f]{64}\Z")
 SLUG = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}\Z")
-OPERATIONS = frozenset({"status", "catalog", "plan_app", "job", "switch_app"})
-JOB_OPERATIONS = frozenset({"plan_app", "switch_app"})
+OPERATIONS = frozenset({"status", "catalog", "plan_app", "job", "switch_app", "official_updater"})
+JOB_OPERATIONS = frozenset({"plan_app", "switch_app", "official_updater"})
 JOB_STATUSES = frozenset({"queued", "running", "succeeded", "failed", "unknown"})
 SENSITIVE_KEY = re.compile(
     r"(^|_)(image|firmware|token|secret|credential|password|payload|request|raw|"
@@ -162,6 +162,7 @@ def normalize_task(value: Any) -> dict[str, Any]:
     expected = ({"catalog_id"} if operation == "plan_app" else
                 {"catalog_id", "entry_method", "expected_sha256", "approval_expires"}
                 if operation == "switch_app" else
+                {"expected_sha256", "approval_expires"} if operation == "official_updater" else
                 {"job_id"} if operation == "job" else set())
     if set(args) != expected:
         raise RelayError("invalid_task")
@@ -171,7 +172,7 @@ def normalize_task(value: Any) -> dict[str, Any]:
     if "job_id" in args and (not isinstance(args["job_id"], str) or
                               not ID.fullmatch(args["job_id"])):
         raise RelayError("invalid_task")
-    if "entry_method" in args and args["entry_method"] not in ("serial", "already_uboot"):
+    if "entry_method" in args and args["entry_method"] not in ("serial", "already_uboot", "auto"):
         raise RelayError("invalid_task")
     if "expected_sha256" in args and (not isinstance(args["expected_sha256"], str)
                                       or not SHA.fullmatch(args["expected_sha256"])):
@@ -349,7 +350,8 @@ def atomic_json(path: Path, value: Any) -> None:
 
 class Relay:
     def __init__(self, state_dir: Path, site: Any, bridge: Any,
-                 *, allow_switch: bool = False, secrets: tuple[str, ...] = ()):
+                 *, allow_switch: bool = False, allow_official_update: bool = False,
+                 secrets: tuple[str, ...] = ()):
         state_dir = Path(state_dir).absolute()
         _no_symlinks(state_dir)
         if state_dir == state_dir.anchor or state_dir == Path(state_dir.anchor):
@@ -359,6 +361,7 @@ class Relay:
         self.lock = StateLock(state_dir / "relay.lock")
         self.site, self.bridge = site, bridge
         self.allow_switch, self.secrets = bool(allow_switch), secrets
+        self.allow_official_update = bool(allow_official_update)
         self.tasks_dir = state_dir / "tasks"
         try:
             _no_symlinks(self.tasks_dir)
@@ -425,6 +428,8 @@ class Relay:
         result = {"id": identifier, "status": "succeeded"}
         if operation == "switch_app" and not resumed and not self.allow_switch:
             return {"id": identifier, "status": "failed", "error": "switch_disabled"}
+        if operation == "official_updater" and not resumed and not self.allow_official_update:
+            return {"id": identifier, "status": "failed", "error": "official_update_disabled"}
         try:
             if operation in JOB_OPERATIONS:
                 # Once executing is committed, even a crash immediately before
@@ -435,9 +440,9 @@ class Relay:
                     except RelayError:
                         return {"id": identifier, "status": "unknown", "error": "bridge_outcome_unknown"}
                 else:
+                    if operation in {"switch_app", "official_updater"} and time.time() >= args["approval_expires"]:
+                        return {"id": identifier, "status": "failed", "error": "approval_expired"}
                     if operation == "switch_app":
-                        if time.time() >= args["approval_expires"]:
-                            return {"id": identifier, "status": "failed", "error": "approval_expired"}
                         catalog = self._bridge_data("GET", "/v1/catalog")
                         apps = catalog.get("apps")
                         if type(apps) is not list:
@@ -450,9 +455,14 @@ class Relay:
                             return {"id": identifier, "status": "failed", "error": "catalog_digest_mismatch"}
                         if matches[0].get("ready") is not True:
                             return {"id": identifier, "status": "failed", "error": "catalog_not_ready"}
-                    body = {"id": identifier, "operation": operation, "catalog_id": args["catalog_id"]}
+                    body = {"id": identifier, "operation": operation}
+                    if operation == "official_updater":
+                        body["expected_sha256"] = args["expected_sha256"]
+                    else:
+                        body["catalog_id"] = args["catalog_id"]
                     if operation == "switch_app":
                         body["entry_method"] = args["entry_method"]
+                    if operation in {"switch_app", "official_updater"}:
                         if time.time() >= args["approval_expires"]:
                             return {"id": identifier, "status": "failed", "error": "approval_expired"}
                     try:
@@ -539,7 +549,8 @@ class Relay:
         atomic_json(self._path(result["id"]), record)
 
     def run_once(self) -> int:
-        self.site.request("POST", "/relay/heartbeat", {"allow_switch": self.allow_switch})
+        self.site.request("POST", "/relay/heartbeat", {"allow_switch": self.allow_switch,
+            "allow_official_update": self.allow_official_update})
         # Recover before asking for more work, including a lost Site result ack.
         for path in sorted(self.tasks_dir.glob("*.json")):
             record = self._load(path.stem)
@@ -569,6 +580,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sites-token-file", type=Path)
     parser.add_argument("--bridge-token-file", type=Path)
     parser.add_argument("--allow-switch", action="store_true")
+    parser.add_argument("--allow-official-update", action="store_true")
     parser.add_argument("--poll-seconds", type=float, default=3)
     parser.add_argument("--once", action="store_true", help="Run one poll cycle, then exit")
     args = parser.parse_args(argv)
@@ -585,6 +597,7 @@ def main(argv: list[str] | None = None) -> int:
             "OAI-Sites-Authorization": "Bearer " + sites_token})
         bridge = JsonClient(bridge_origin, {"Authorization": "Bearer " + bridge_token})
         relay = Relay(args.state_dir, site, bridge, allow_switch=args.allow_switch,
+                      allow_official_update=args.allow_official_update,
                       secrets=(relay_token, sites_token, bridge_token))
         while True:
             try:

@@ -87,7 +87,8 @@ def main():
     job.add_argument('--request-file', type=Path)
     job.add_argument('--loader-state', choices=('cold', 'reuse'))
     job.add_argument('--catalog-id')
-    job.add_argument('--entry-method', choices=('serial', 'already_uboot'))
+    job.add_argument('--entry-method', choices=('auto', 'serial', 'already_uboot'))
+    job.add_argument('--expected-sha256')
     job.add_argument('--id', default=None)
     job.add_argument('--wait', action='store_true')
     job.add_argument('--seconds', type=int, default=1300)
@@ -109,7 +110,7 @@ def main():
     elif args.command == 'job':
         ident = args.id or uuid.uuid4().hex
         body = {'id': ident, 'operation': args.operation}
-        for name in ('loader_state', 'catalog_id', 'entry_method'):
+        for name in ('loader_state', 'catalog_id', 'entry_method', 'expected_sha256'):
             value = getattr(args, name)
             if value is not None:
                 body[name] = value
