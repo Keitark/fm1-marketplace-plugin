@@ -5,17 +5,71 @@ polls the private hosted Site using outbound HTTPS and forwards a small set of
 operations to the existing authenticated bridge. It imports no USB/serial
 backend and does not start, restart, configure, or replace the bridge or its
 protected writer session. The installed plugin, native panel, website, and live
-relay have passed metadata round trips. Site version 3 is privately deployed
+relay have passed metadata round trips. Site version 4 is privately deployed
 and MCP-ready; the actual Codex panel renders the updated black/mint UI with
-**FM1 on COM4**. The v1/v2 resource aliases return the current v3 UI for older
+**FM1 in UBOOT**. The v1/v2/v3 resource aliases return the current v4 UI for older
 installed descriptors.
-Protected-session preparation,
-device operations, and physical acceptance remain separate bench work.
+The verified protected session and current baseline are now prepared as dated
+below. Device writes and physical acceptance remain separate bench work.
 
-## Verified metadata setup on 2026-10-09
+## Current live acceptance (2026-10-10)
 
-The supported local bridge remains on loopback port 9770 without a
-`SessionRoot` or official updater; its recorded PID is **134988**. The relay was
+Owner-private Site v4 deployment `appgdep_6ac9903cd9e08191b5df920575373d1e`
+has MCP enabled and source SHA `bd87d14a039b8ef5233a6b3c60291c3642ee7f98`.
+The actual native MCP App panel renders its dark background (`rgb(16,26,24)`)
+and **Refresh** works. It shows **FM1 in UBOOT**, six packages ready, switching
+**Enabled**, and the pinned official updater as **Needs FM1 MIDI connection**.
+The NES switch review showed **auto → already_uboot** and the correct digest;
+the review was canceled without submitting a switch.
+
+Native NES **View plan** then succeeded for original bridge job/request
+`427b240eda7c4867b403aee8f8838682`; inspection request
+`ea27707a4bb04f428aef9d4729b21f1e` and installed `get_fm1_request` confirmed
+that original ID. The authoritative job reported `status:succeeded`,
+`result.ok:true`, `device_io:false`, `blocked:false` and **96 planned sectors**,
+candidate SHA-256
+`4d4da3ab34b643034ea91ddb670fd3556b737a05835ed77fced687eae6ad345c`.
+Write completion, full readback and boot verification were false. No actual
+candidate flash was submitted. The installed tool's structured result is
+preserved in the [saved native plan response](evidence/fm1-v4-native-plan-20261010.json).
+
+The current helper is
+`C:\Program Files\FM1FlashSession-53b32bdc8a444cdda6c838934831e49c`, recorded
+PID **240396**, using the frozen runtime with `trusted_local:false`. Its state
+is idle/unblocked with no running loader or pending reset, including after the
+offline plan. The verified
+baseline is from two matching actual 1 MiB reads, SHA-256
+`c719cad560ddcbc05a795cb77e11d65eeb108e1dfdb76afb508d71533437bf1f`;
+originals remain under `readback-source`. The adopted baseline's target guard
+remains local, and no raw physical identifier is published.
+
+The supported bridge remains on loopback **9770**, now recorded PID **262496**,
+with existing state `C:\Users\keita\AppData\Local\FM1RemoteBridge`. The relay
+is recorded PID **223876**, with existing state
+`C:\Users\keita\AppData\Local\FM1SiteRelay\fm1-app-library`. Both
+`-AllowSwitch` and `-AllowOfficialUpdate` were enabled intentionally after
+session validation. Existing tokens were retained privately. Process IDs are
+dated observations; inspect live state before attempting a restart or launch.
+
+The official updater has its full vendor dependency directory at
+`F:\dev\fm1\references\downloads\M-UPGRADE-20261010\M-UPGRADE`; the pinned
+`M-UPGRADE.exe` SHA-256 is
+`cbda7a95e506cdeefbe39e9718106586147f2ee9857a83e0509644e349591e3b`.
+UBOOT currently exposes no official MIDI pair, so vendor handoff/transfer and
+physical candidate startup acceptance remain pending. A configured executable
+and enabled capability do not establish a ready MIDI route or completed update.
+
+Current checks passed 99 focused runtime tests, 189 integration Python tests,
+10 JavaScript tests, 69 Site tests, typechecking, production build and
+PowerShell parsing. One absent private profile fixture was excluded from the
+runtime scope; broad private writer fixture acceptance is not claimed. See
+[VERIFICATION.md](VERIFICATION.md) and the
+[native v4 panel screenshot](images/fm1-native-panel-v4-live.png).
+
+## Historical metadata setup (2026-10-09, v3)
+
+At that check, the supported local bridge remained on loopback port 9770 without
+a `SessionRoot` or official updater; its recorded PID was **134988**. The relay was
 restarted with its existing state and switching disabled; its recorded PID is
 **422648**. These are 2026-10-09 observations, not permanent process identities.
 See [VERIFICATION.md](VERIFICATION.md) for the dated receipts. Inspect the
@@ -34,9 +88,9 @@ The MDX plan request/bridge job `d984e14543204d1e93a966099cc708d7` had delivery
 message **Start a protected session on the laptop first**. Native saved-job
 inspection after the relay restart used delivery request
 `2e5b770a13ed49c69ba90f18bdca17ea` and returned that same original job. No device I/O or
-protected-helper creation occurred. The older snapshot worker is stopped and
-lacks the required remote-read guard; it must not be reactivated as a shortcut.
-The remote laptop is offline, so its earlier protected setup is not current
+protected-helper creation occurred. The older snapshot worker was stopped and
+lacked the required remote-read guard; it must not be reactivated as a shortcut.
+The remote laptop was offline, so its earlier protected setup was not current
 local session evidence.
 
 ## Authentication and origins
@@ -224,9 +278,11 @@ duplicate task and process exclusion, interrupted submission/restart recovery,
 batch persistence, and lost Site acknowledgments. They neither connect to the
 actual Site nor start any device operation.
 
-The current aggregate Python run passed **150 tests**; the focused relay run
-passed **51 tests**. See [VERIFICATION.md](VERIFICATION.md) for the dated
-counts, live metadata evidence, and v3 deployment/native panel acceptance. The
+The earlier aggregate Python run passed **150 tests** and focused relay run
+passed **51 tests**; these counts are historical. The current relay suite
+passed **62 tests** within the 189-test integration run above. See
+[VERIFICATION.md](VERIFICATION.md) for dated counts and deployment/native
+panel acceptance. The
 suite includes recursive physical-identifier filtering, ASCII/multibyte
 metadata size boundaries, legacy receipt replay, and recovery only after a
 proven oversize rejection. Remote modern-protocol acceptance and physical

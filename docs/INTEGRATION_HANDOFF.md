@@ -1,6 +1,6 @@
 # FM1 Codex integration handoff
 
-## Current implementation and acceptance
+## Current implementation
 
 This repository now includes the FM1 Site adapter, MCP App panel, top-level
 WebMCP tools and outbound Windows relay alongside the original store/bridge
@@ -13,6 +13,68 @@ App iframe, and live Site WebMCP Refresh worked through the authenticated
 local relay. The native plugin/panel is the user's selected primary interface;
 it does not require a Chrome extension.
 
+## Current acceptance (2026-10-10)
+
+Site **v4** is deployed owner-private with MCP enabled. Deployment
+`appgdep_6ac9903cd9e08191b5df920575373d1e` uses source
+`bd87d14a039b8ef5233a6b3c60291c3642ee7f98`. The resource is
+`ui://fm1/device-panel-v4.html`; v1, v2 and v3 aliases serve the current panel.
+The actual native MCP App panel renders the dark interface (`rgb(16,26,24)`),
+and **Refresh** succeeds. It shows **FM1 in UBOOT**, six ready catalog packages,
+app switching **Enabled**, and the configured official updater as
+**Needs FM1 MIDI connection**. A NES review displayed **auto → already_uboot**
+and the reviewed package digest; it was canceled without submitting a switch.
+
+The native NES **View plan** succeeded with original request/bridge job
+`427b240eda7c4867b403aee8f8838682`. Inspection request
+`ea27707a4bb04f428aef9d4729b21f1e` and the installed `get_fm1_request` tool
+returned that same original job with authoritative `status:succeeded`,
+`result.ok:true`, `device_io:false`, `blocked:false`, and **96 planned sectors**.
+Its candidate SHA-256 is
+`4d4da3ab34b643034ea91ddb670fd3556b737a05835ed77fced687eae6ad345c`.
+`write_complete`, `full_readback_verified` and `boot_verified` remain false:
+this accepts offline planning, not a candidate write or startup. The
+[saved native plan response](evidence/fm1-v4-native-plan-20261010.json) records
+the installed tool result. Three historical failed `plan_app` jobs remain
+preserved alongside this successful job.
+
+The current protected helper is
+`C:\Program Files\FM1FlashSession-53b32bdc8a444cdda6c838934831e49c`
+(recorded PID **240396**). It uses the frozen Python runtime with
+`trusted_local:false`; state is idle/unblocked with no running loader or reset
+pending, including after the offline plan. Two actual matching 1 MiB device
+reads established baseline SHA-256
+`c719cad560ddcbc05a795cb77e11d65eeb108e1dfdb76afb508d71533437bf1f`.
+Original read evidence is preserved under `readback-source`. The adopted
+baseline retains its local target identity guard; physical identifiers and
+firmware bytes are not published through the Site.
+
+The bridge is on loopback port **9770**, recorded PID **262496**, retaining
+`C:\Users\keita\AppData\Local\FM1RemoteBridge`. The outbound relay is recorded
+PID **223876**, retaining
+`C:\Users\keita\AppData\Local\FM1SiteRelay\fm1-app-library`. Both
+`AllowSwitch` and `AllowOfficialUpdate` were intentionally enabled after session
+validation. These are dated process observations; inspect current processes
+before a future launch. Existing tokens remain private and were retained.
+
+The pinned vendor closure is the full directory containing
+`F:\dev\fm1\references\downloads\M-UPGRADE-20261010\M-UPGRADE\M-UPGRADE.exe`;
+its executable SHA-256 is
+`cbda7a95e506cdeefbe39e9718106586147f2ee9857a83e0509644e349591e3b`.
+The device is currently in UBOOT and its official MIDI interface is absent.
+Vendor GUI transfer, a candidate flash, and physical candidate startup,
+screen/audio/control acceptance remain pending. No actual flash was submitted.
+
+Validation passed **99 focused runtime tests**, **189 integration Python
+tests**, **10 JavaScript tests**, and **69 Site tests**, plus Site typechecking,
+production build and PowerShell parsing. One absent private profile fixture was
+excluded from the runtime scope; broad private writer fixture acceptance is
+not claimed. The 69 Site tests comprise 40 server, 25 UI and 4 actual SDK tests.
+
+![Native v4 dark panel showing UBOOT and ready packages](images/fm1-native-panel-v4-live.png)
+
+## Historical metadata acceptance (2026-10-09)
+
 At the recorded 2026-10-09 metadata check, the local bridge had no configured
 protected session or official updater. Inventory reported COM4 and CDC/audio interfaces, and six validated
 private packages all remained `ready:false`. An MDX plan reached the bridge
@@ -21,29 +83,29 @@ created and no device I/O, firmware write, or physical acceptance occurred.
 The browser's six WebMCP tools also passed earlier synthetic execution and
 invalid-input checks.
 
-## Current SDK deployment and native panel
+## Historical v3 SDK deployment and native panel (2026-10-09)
 
 Site version **3** pins official server SDK **2.3.1** and **ext-apps 2.0.3**.
-The current Site suite passed **45 tests** (26 server, 15 UI, 4 SDK), typechecking
+The then-current Site suite passed **45 tests** (26 server, 15 UI, 4 SDK), typechecking
 and the production build passed, and deployment
 `appgdep_6ac8fc0660648191a2521acd37271e3c` succeeded with runtime revision 1
 and MCP-ready status. Its source SHA is
 `0e76fa6923d74ca96f71312a77d033b4c4935723`. Actual SDK Client 2.3.1 negotiated
 current **2026-07-28** and legacy **2025-11-25** protocols in memory.
 
-The current native Codex panel renders the black/mint **FM1 plugin** interface
-with **FM1 on COM4**. Its current descriptor points to
-`ui://fm1/device-panel-v3.html`; the v1 and v2 resource URLs also serve the
-current UI, preserving older installed registrations. A read-only Codex
+The v3 native Codex panel rendered the black/mint **FM1 plugin** interface
+with **FM1 on COM4**. Its then-current descriptor pointed to
+`ui://fm1/device-panel-v3.html`; the v1 and v2 resource URLs also served that
+UI, preserving older installed registrations. A read-only Codex
 app-server metadata refresh reported the installed app callable and its new
 **FM1 device panel** tool title. Compatibility resource reads resolved the
 previous stale native UI without reinstalling the plugin. The existing
 panel-tab title can still reflect its earlier registration.
 
-A direct deployed SDK Client probe using the existing
-relay service credential returned **HTTP 401**, so modern remote protocol
-negotiation is not accepted by that check. See [VERIFICATION.md](VERIFICATION.md)
-for the exact evidence and remaining boundaries.
+The historical direct deployed SDK Client probe using the existing relay
+service credential returned **HTTP 401**. That credential-specific probe did
+not establish remote modern-protocol negotiation. See
+[VERIFICATION.md](VERIFICATION.md) for the exact evidence and remaining boundaries.
 
 ## Architecture
 
@@ -109,10 +171,10 @@ The adapter does not implement a direct SysEx sender or convert app bundles to
 persistently blocks device jobs. After official completion, establish a fresh
 protected session and verified current-unit baseline; retain prior evidence.
 
-Auto routing and official handoff are implementation capabilities with offline
-coverage. Hosted deployment, actual GUI operation, readback and physical
-screen/audio/control acceptance require their own dated evidence. The earlier
-metadata acceptance above does not establish those results.
+Auto routing and official handoff have offline contract coverage. The dated
+v4 deployment, native review, successful offline plan and verified baseline
+acceptance are recorded above. Actual vendor transfer, a candidate write and
+physical screen/audio/control acceptance remain separate pending checks.
 
 Only metadata crosses the relay. Keep private catalog bundle JSON, firmware,
 ROM/music inputs, baseline images, session descriptors, receipts, device paths
@@ -143,25 +205,26 @@ Unknown device outcomes retain the bridge's persistent block and require local
 inspection. Offline backend exceptions now produce `failed`, so a failed
 `plan_app`, `plan` or `environment` request does not create device uncertainty.
 
-Metadata rollout now uses the supported local bridge on loopback port 9770
+The historical 2026-10-09 metadata rollout used the supported local bridge on loopback port 9770
 (observed PID 134988) and updated relay (observed PID 422648), with switching disabled.
 These process IDs are dated evidence, not future launch configuration. The
 relay never launches or restarts the bridge or replaces its state.
 Do not substitute a new state directory, clear latches or change a frozen helper
 to bring the Site online. Inspect live launcher/session selection before any
-operational change. The older protected snapshot worker is stopped and lacks
-the required remote-read guard, and the remote laptop is offline. Do not
-reactivate that worker or infer that its historical session is usable locally.
+operational change. At that check, the older protected snapshot worker was
+stopped and lacked the required remote-read guard, and the remote laptop was
+offline. Do not reactivate that worker or infer that its historical session is
+usable locally.
 
-The saved MDX plan request/job `d984e14543204d1e93a966099cc708d7` was delivered
+The historical MDX plan request/job `d984e14543204d1e93a966099cc708d7` was delivered
 successfully but has authoritative status `failed` with **Start a protected
-session on the laptop first**. Current native inspection request
+session on the laptop first**. Historical native inspection request
 `2e5b770a13ed49c69ba90f18bdca17ea` verified the original saved job. It used no
-device I/O. This is current evidence of transport and prerequisite handling,
+device I/O. This is historical evidence of transport and prerequisite handling,
 not successful planning or device acceptance.
 
-Before device operations, establish an idle verified protected session and
-unit-specific baseline through the bench workflow. Separately accept any
+Maintain the verified protected session and unit-specific baseline through
+the bench workflow before device operations. Separately accept any
 explicitly authorized hardware operation and physical screen/audio/control behavior.
 
 ## Provenance and ownership
@@ -175,6 +238,7 @@ contract.
 
 The **Set up remote debug kit** chat retains ownership of live bench setup and
 private assets. Coordinate operational changes with that owner. The protected
-helper, verified unit-specific baseline, vendor USB dependencies and physical
-screen/audio/control acceptance remain external prerequisites. This integration
-does not install or replace those assets.
+helper, verified unit-specific baseline and full vendor directory are now
+provisioned as recorded above; preserve those assets and their evidence.
+Physical candidate startup and screen/audio/control acceptance remain pending.
+The hosted Site does not create or replace the protected session or baseline.

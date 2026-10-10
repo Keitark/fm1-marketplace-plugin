@@ -11,8 +11,9 @@ local. Version 4 is privately deployed with pinned server SDK 2.3.1 and
 ext-apps 2.0.3. It detects serial, UBOOT and official MIDI/SysEx modes, selects
 the protected app route automatically, and provides a reviewed handoff to the
 pinned official Windows updater. Firmware writes still require human confirmation.
-Local tests/build and hosted metadata transport passed. Physical write acceptance
-remains separate.
+Local tests/build, protected runtime setup, verified readback adoption and the
+native offline plan passed. Physical candidate write and startup acceptance
+remain separate.
 See [VERIFICATION.md](docs/VERIFICATION.md).
 
 The owner-private [FM1 App Library](https://fm1-app-library.keitark.chatgpt.site)

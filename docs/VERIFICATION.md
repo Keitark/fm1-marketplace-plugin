@@ -19,17 +19,46 @@
   and two identical complete 1 MiB readbacks completed. No flash-array program
   or erase command was sent. The readback matches the MDX RayForce catalog image
   and differs from the historical seed baseline. The source protected receipt
-  and both images are preserved; baseline migration and session attachment are
-  recorded below when verified.
+  and both images are preserved. The stopped source was then migrated into a
+  new protected frozen-runtime session; its fresh double-read baseline and
+  original evidence remain separate, with the target identity guard retained.
+  After the user's power cycle, the supported serial-to-UBOOT transition passed.
+  The replacement helper is idle and unblocked, without a running RAM loader or
+  pending reset. The bridge and relay now use this session and retain their
+  existing credentials and saved job history.
+- The actual native MCP App panel renders the black/mint v4 UI. Refresh returned
+  `FM1 in UBOOT`, switching enabled, and all six packages ready. NES review
+  selected `auto -> already_uboot`; it was cancelled without submitting a write.
+  The official updater is configured, while its review control correctly says
+  `Needs FM1 MIDI connection` in this UBOOT state.
+- Native `View plan` created NES job `427b240eda7c4867b403aee8f8838682`.
+  `Inspect job` reused that exact ID through request
+  `ea27707a4bb04f428aef9d4729b21f1e`. Both the native panel and installed plugin
+  request tool returned authoritative `status:succeeded`, `result.ok:true`,
+  `device_io:false`, `blocked:false`, 96 planned sectors, and the reviewed
+  package SHA-256
+  `4d4da3ab34b643034ea91ddb670fd3556b737a05835ed77fced687eae6ad345c`.
+  Write, full-readback and boot-verification progress remained false. This
+  resolves the historical missing-session plan prerequisite without claiming
+  firmware programming or physical startup acceptance.
+  The installed tool's saved response is retained in
+  [the native plan evidence](evidence/fm1-v4-native-plan-20261010.json).
+- Integration GitHub CI passed both the offline bridge/store and Site contract
+  build jobs on source checkpoint `123c492` (run `38012265242`). The separate
+  runtime checkpoint `47a43f2` passed 99 focused tests, including the actual
+  copied interpreter and named pipes. One absent private profile fixture was
+  excluded, and the full private writer fixture suite was not run.
 - Generic M-UPGRADE was downloaded from the manufacturer; its executable hash
   and external `.fwsc` chooser were checked statically with its full Qt closure.
   The official MIDI/SysEx transfer and physical write/startup acceptance remain
   untested on this device. GUI handoff is never treated as verified programming.
 
+![Native v4 plugin, current UBOOT route and ready packages](images/fm1-native-panel-v4-live.png)
+
 ## Historical release, 2026-10-09
 
 The checks below were recorded on 2026-10-09 using Python 3.11.0 and
-Node.js v22.22.2 on Windows. Current Site version 3, the final offline suite,
+Node.js v22.22.2 on Windows. Site version 3, that release's final offline suite,
 and actual native-panel acceptance are recorded below. Earlier import and
 version 2 observations remain historical evidence.
 Offline checks started no live bridge,
