@@ -13,7 +13,20 @@ App iframe, and live Site WebMCP Refresh worked through the authenticated
 local relay. The native plugin/panel is the user's selected primary interface;
 it does not require a Chrome extension.
 
-## Current acceptance (2026-10-10)
+## Subsequent NES operation and progress correction (2026-10-10)
+
+The later NES switch `9067aa03ef7f4826b9f143722cb5635e` succeeded with 96/96
+verified sectors, matching full readback and serial startup. Fresh inventory
+then reported COM10 in normal serial mode and an idle/unblocked session. The
+UI correction automatically follows the original saved job using read-only
+inspection; v5 Refresh preserves its progress. Site v5 is published, but the
+newly opened native panel still received cached v4, so live v5 automatic
+tracking acceptance awaits host metadata/resource-cache refresh and reopening.
+See [VERIFICATION.md](VERIFICATION.md) for the actual switch
+response, progress regressions and publication evidence. Physical screen,
+audio and controls, and vendor SysEx transfer, remain separate bench checks.
+
+## Initial v4 setup acceptance (2026-10-10)
 
 Site **v4** is deployed owner-private with MCP enabled. Deployment
 `appgdep_6ac9903cd9e08191b5df920575373d1e` uses source

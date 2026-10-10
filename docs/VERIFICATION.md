@@ -1,6 +1,56 @@
 # Integration verification
 
-## Current update, 2026-10-10
+## Subsequent NES programming and progress correction, 2026-10-10
+
+The saved switch job `9067aa03ef7f4826b9f143722cb5635e` completed at
+10:38 JST. Installed-tool inspection request
+`096c7f619cc44de69e1bc3c00d0f9d07` returned authoritative `status:succeeded`,
+`result.ok:true`, 96/96 verified sectors, `write_complete:true`,
+`full_readback_verified:true` and `boot_verified:true`. Its full-image readback
+SHA-256 matches NES candidate
+`4d4da3ab34b643034ea91ddb670fd3556b737a05835ed77fced687eae6ad345c`.
+The retained [actual switch response](evidence/fm1-nes-switch-20261010.json)
+distinguishes the physical write from the earlier offline plan. Startup evidence
+is serial identification and advancing counters; `physical_acceptance:false`
+and the display/audio/control bench boundary remain explicit.
+
+Fresh status request `af69f2586c3647d89153631e511d6eee` reported normal serial
+mode on COM10, an idle/unblocked protected session without a running loader or
+pending reset, and two succeeded jobs alongside the three retained failed plans.
+No write was repeated while inspecting or correcting the UI.
+
+The previous UI stopped after delivery succeeded, leaving the submitted job's
+queued snapshot on screen. The correction follows the exact saved bridge job
+with read-only inspection until its authoritative terminal state. It preserves
+progress during Refresh, cancels obsolete/teardown work, bounds polling, and
+stops on delivery or connection uncertainty. Missing counts do not invent a
+percentage. Plans, writes and confirmations are never automatically resubmitted.
+All **84 Site tests passed** (40 server, 40 UI, 4 SDK), including 15 new progress
+regressions and both protocol variants with v1/v2/v3/v4 resource compatibility.
+
+Typechecking and the production build passed. The source workflow packaged
+and pushed `7c2a46dd4719db0b415a2645db65e5f7b1288a3d`; private deployment
+`appgdep_6ac99af9c4f08191b1207fe174a0fa88` succeeded at 10:56 JST with MCP enabled
+and environment revision 1. Site v5 advertises server version `2.1.1` and
+`ui://fm1/device-panel-v5.html`, retaining v1/v2/v3/v4 aliases. SDK pins remain
+server `2.3.1` and ext-apps `2.0.3`.
+
+The newly opened native panel still loaded the prior v4 application script:
+14,957 characters without `selectedWork` or `followJob`, rather than v5's
+18,502-character script containing both. A separate background check of the
+live Site confirmed that it serves the new 18,502-character application script
+with automatic tracking and the metadata-preservation guard. Native **Inspect job** displayed the
+actual NES result and 96/96 sector bar, but the old UI hid it after metadata
+Refresh completed. This accepts saved-job inspection, not the v5 automatic
+progress loop in the live native host. Native v5 acceptance remains pending
+resource-cache refresh. OpenAI documents [UI resources as cache keys](https://developers.openai.com/plugins/build/chatgpt-ui)
+and [continuous tool review and resource caching](https://developers.openai.com/plugins/deploy/app-review);
+ChatGPT may retain compatible resource contents for up to an hour. Reopening
+alone did not bypass the cache in this observed Codex panel.
+
+![Cached native panel displaying the actual completed NES job and sector bar](images/fm1-native-panel-cached-progress-20261010.png)
+
+## Initial setup update, 2026-10-10
 
 - 189 Python tests passed in 36.368 seconds; these include 62 relay tests,
   passive mode detection, route/identity revalidation, pinned updater handoff,

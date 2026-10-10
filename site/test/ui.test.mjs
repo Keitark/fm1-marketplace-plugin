@@ -6,10 +6,11 @@ import { callTool } from '../lib/fm1-server.mjs';
 import { database, connect, cacheCatalog, cacheInventory, digest } from './d1.mjs';
 
 const tick=()=>new Promise(resolve=>setTimeout(resolve,15));
-async function panel({embedded=false,initial=true,serverTools=true,inventory=null,official=false,loseConfirmationReply=false}={}){
+async function until(predicate){for(let attempt=0;attempt<100;attempt++){if(predicate())return;await tick();}assert.fail('Panel did not reach the expected state.');}
+async function panel({embedded=false,initial=true,serverTools=true,inventory=null,official=false,loseConfirmationReply=false,jobData=null,beforeCall=null,nativeControls=false,omitPlanJobId=false}={}){
   const env=database();connect(env,true,official);cacheCatalog(env);if(inventory)cacheInventory(env,'alice',inventory);
-  const nodes=new Map(),registered=new Map(),requests=[],requestArgs=[],events=new Map(),notifications=[];
-  function node(id){if(!nodes.has(id))nodes.set(id,{textContent:'',innerHTML:'',value:'',hidden:true,open:false,style:{},querySelectorAll:()=>[],querySelector:()=>null,removeAttribute(){},showModal(){this.open=true;},close(){this.open=false;},addEventListener(name,fn){this[name]=fn;}});return nodes.get(id);}
+  const nodes=new Map(),registered=new Map(),requests=[],requestArgs=[],events=new Map(),notifications=[],timers=new Map(),delays=[];
+  function node(id){if(!nodes.has(id)){let text='';nodes.set(id,{history:[],get textContent(){return text;},set textContent(value){text=value;this.history.push(value);},innerHTML:'',value:id==='variant-nes'?'nes-test':'',dataset:{profile:'nes',plan:'nes',switch:'nes'},hidden:true,open:false,style:{},querySelectorAll:selector=>id==='library'&&nativeControls?selector==='select'?[node('variant-nes')]:selector==='[data-plan]'?[node('plan-nes')]:selector==='[data-switch]'?[node('switch-nes')]:[]:[],querySelector:selector=>id==='library'&&nativeControls?(selector.startsWith('[data-profile=')?node('variant-nes'):node('digest-nes')):null,removeAttribute(name){if(name==='value')delete this.value;},showModal(){this.open=true;},close(){this.open=false;},addEventListener(name,fn){this[name]=fn;}});}return nodes.get(id);}
   const initialData=await callTool(env,'alice','open_fm1_library',{});
   if(inventory)initialData.inventory=inventory;
   const window={addEventListener(name,fn,options){events.set(name,fn);options?.signal?.addEventListener('abort',()=>events.delete(name));},removeEventListener(name){events.delete(name);}};
@@ -25,12 +26,12 @@ async function panel({embedded=false,initial=true,serverTools=true,inventory=nul
   });}}:window;
   window.parent=parent;
   function toolResult(answer){const {_approval,...data}=answer;return {content:[],structuredContent:data,...(_approval?{_meta:{approval_id:_approval}}:{})};}
-  async function backend(name,args){requests.push(name);requestArgs.push({name,args});const answer=await callTool(env,'alice',name,args);if(answer.request_id){env.DB.sqlite.prepare('UPDATE relay_tasks SET state=?,result=? WHERE id=?').run('succeeded',JSON.stringify({status:'succeeded',data:{id:args.job_id||answer.job_id||answer.request_id,status:'succeeded',simulation:true}}),answer.request_id);}return answer;}
+  async function backend(name,args){requests.push(name);requestArgs.push({name,args});await beforeCall?.(name,args);const answer=await callTool(env,'alice',name,args);if(answer.request_id){const defaultJob={id:args.job_id||answer.job_id||answer.request_id,status:'succeeded',simulation:true},data=jobData?await jobData({name,args,answer,defaultJob}):defaultJob;if(data!==null)env.DB.sqlite.prepare('UPDATE relay_tasks SET state=?,result=? WHERE id=?').run('succeeded',JSON.stringify({status:'succeeded',data}),answer.request_id);}if(omitPlanJobId&&name==='plan_fm1_app'){const {job_id,...queued}=answer;return queued;}return answer;}
   const document={body:{classList:{add(){}},dataset:{}},getElementById:node,modelContext:{async registerTool(tool,{signal}){registered.set(tool.name,tool);signal.addEventListener('abort',()=>registered.delete(tool.name));}}};
-  const context=vm.createContext({document,window,AbortController,Map,Object,Number,JSON,RegExp,String,Error,URL,TextEncoder,TextDecoder,crypto,queueMicrotask,setTimeout:(fn,ms)=>setTimeout(fn,ms>=10000?500:1),clearTimeout,fetch:async(_url,options)=>{const input=JSON.parse(options.body);try{const answer=await backend(input.name,input.arguments);if(loseConfirmationReply&&input.name.startsWith('confirm_'))throw new Error('Confirmation reply lost.');return {ok:true,json:async()=>({structuredContent:answer})};}catch(error){return {ok:false,json:async()=>({error:error.message})};}}});
+  const context=vm.createContext({document,window,AbortController,Map,Object,Number,JSON,RegExp,String,Error,URL,TextEncoder,TextDecoder,crypto,queueMicrotask,setTimeout:(fn,ms)=>{delays.push(ms);const timer=setTimeout(()=>{timers.delete(timer);fn();},ms>=10000?500:1);timers.set(timer,ms);return timer;},clearTimeout:timer=>{timers.delete(timer);clearTimeout(timer);},fetch:async(_url,options)=>{const input=JSON.parse(options.body);try{const answer=await backend(input.name,input.arguments);if(loseConfirmationReply&&input.name.startsWith('confirm_'))throw new Error('Confirmation reply lost.');return {ok:true,json:async()=>({structuredContent:answer})};}catch(error){return {ok:false,json:async()=>({error:error.message})};}}});
   for(const script of UI_HTML.matchAll(/<script>([\s\S]*?)<\/script>/g))vm.runInContext(script[1],context);
   await tick();
-  return {env,nodes,registered,requests,requestArgs,events,notifications,parent,window,node,async invoke(name,args){return registered.get(name).execute(args);},dispose(){events.get('pagehide')?.();}};
+  return {env,nodes,registered,requests,requestArgs,events,notifications,timers,delays,parent,window,node,async invoke(name,args){return registered.get(name).execute(args);},dispose(){events.get('pagehide')?.();}};
 }
 test('host initial tool result renders without a duplicate library request',async()=>{const p=await panel({embedded:true});assert.equal(p.node('relay-state').textContent,'Connected');assert.equal(p.requests.length,0);assert.equal(p.registered.size,0);p.dispose();});
 test('initial host result renders even without serverTools capability',async()=>{const p=await panel({embedded:true,serverTools:false});assert.equal(p.node('relay-state').textContent,'Connected');assert.equal(p.requests.length,0);p.dispose();});
@@ -184,4 +185,184 @@ test('native teardown clears a staged official approval before any later trusted
   assert.ok(!p.requests.includes('confirm_fm1_official_update'));
   assert.equal(p.env.DB.sqlite.prepare('SELECT used FROM official_update_approvals').get().used,0);
   p.dispose();
+});
+
+function progressJob(id,status,verified=0,total=96,phase=status==='succeeded'?'completed':status==='running'?'write':status){
+  return {id,status,progress:{phase,verified_sectors:verified,total_sectors:total,message:'Fixture receipt',
+    write_complete:verified===total,full_readback_verified:status==='succeeded',boot_verified:status==='succeeded',failed:status==='failed'}};
+}
+
+test('native plan submission follows only its exact saved job through running sector and readback progress',async()=>{
+  let reads=0;
+  const p=await panel({embedded:true,nativeControls:true,jobData:({name,defaultJob})=>{
+    if(name==='plan_fm1_app')return {...defaultJob,status:'queued'};
+    if(name==='get_fm1_job'){reads++;return progressJob(defaultJob.id,reads<7?'running':'succeeded',reads<6?reads*12:96,96,reads===6?'readback':reads<7?'write':'completed');}
+    return defaultJob;
+  }});
+  p.node('plan-nes').onclick();
+  await until(()=>p.node('detail').textContent.includes('"status": "succeeded"'));
+  const id=p.node('job-id').value,inspections=p.requestArgs.filter(item=>item.name==='get_fm1_job');
+  assert.equal(inspections.length,7);assert.ok(inspections.every(item=>item.args.job_id===id));
+  assert.equal(p.requests.filter(name=>name==='plan_fm1_app').length,1);
+  assert.ok(!p.requests.includes('confirm_fm1_switch'));assert.ok(!p.requests.includes('get_fm1_status'));assert.ok(!p.requests.includes('list_fm1_apps'));
+  assert.ok(p.node('detail').history.some(value=>value.includes('"phase": "readback"')));
+  assert.ok(p.node('progress-text').history.some(value=>value.includes('12/96 sectors verified')));
+  assert.equal(p.node('progress').hidden,false);assert.equal(p.node('progress-bar').max,96);assert.equal(p.node('progress-bar').value,96);
+  assert.ok(p.delays.includes(1000));assert.ok(p.delays.includes(3000));
+  const count=p.requests.length;await tick();assert.equal(p.requests.length,count);p.dispose();
+});
+
+test('native trusted switch confirmation follows progress without repeating confirmation or the write',async()=>{
+  let reads=0;
+  const p=await panel({embedded:true,nativeControls:true,inventory:detectedInventory('uboot'),jobData:({name,defaultJob})=>{
+    if(name==='confirm_fm1_switch')return {...defaultJob,status:'queued'};
+    if(name==='get_fm1_job')return progressJob(defaultJob.id,++reads===1?'running':'succeeded',reads===1?32:96);
+    return defaultJob;
+  }});
+  p.node('switch-nes').onclick();await until(()=>p.node('approval').open);
+  const id=p.env.DB.sqlite.prepare('SELECT id FROM switch_approvals').get().id;
+  p.node('confirm').onclick({isTrusted:true});p.node('confirm').onclick({isTrusted:true});
+  await until(()=>p.node('detail').textContent.includes('"boot_verified": true'));
+  assert.equal(p.node('job-id').value,id);assert.equal(p.requests.filter(name=>name==='confirm_fm1_switch').length,1);
+  assert.equal(p.env.DB.sqlite.prepare("SELECT count(*) AS n FROM relay_tasks WHERE operation='switch_app'").get().n,1);
+  assert.ok(p.requestArgs.filter(item=>item.name==='get_fm1_job').every(item=>item.args.job_id===id));
+  assert.equal(reads,2);p.dispose();
+});
+
+test('native plan follows the submission request ID when the host response has no job_id field',async()=>{
+  let reads=0;
+  const p=await panel({embedded:true,nativeControls:true,omitPlanJobId:true,jobData:({name,defaultJob})=>{
+    if(name==='plan_fm1_app')return {...defaultJob,status:'queued'};
+    if(name==='get_fm1_job')return progressJob(defaultJob.id,++reads===1?'running':'succeeded',reads===1?16:96);
+    return defaultJob;
+  }});
+  p.node('plan-nes').onclick();await until(()=>p.node('detail').textContent.includes('"status": "succeeded"'));
+  const id=p.env.DB.sqlite.prepare("SELECT id FROM relay_tasks WHERE operation='plan_app'").get().id;
+  assert.equal(p.node('job-id').value,id);assert.equal(reads,2);
+  assert.ok(p.requestArgs.filter(item=>item.name==='get_fm1_job').every(item=>item.args.job_id===id));
+  assert.equal(p.requests.filter(name=>name==='plan_fm1_app').length,1);p.dispose();
+});
+
+test('Refresh updates metadata while preserving selected progress during work and after completion',async()=>{
+  let reads=0,release;const held=new Promise(resolve=>{release=resolve;});const id='e'.repeat(32);
+  const p=await panel({beforeCall:async name=>{if(name==='get_fm1_job'&&reads===1)await held;},jobData:({name,defaultJob})=>name==='get_fm1_job'?progressJob(defaultJob.id,++reads===1?'running':'succeeded',reads===1?32:96):defaultJob});
+  const following=p.invoke('inspect_fm1_job',{job_id:id});await until(()=>p.node('progress-text').textContent.includes('32/96'));
+  const runningDetail=p.node('detail').textContent;await p.invoke('refresh_fm1_library',{});
+  assert.equal(p.node('detail').textContent,runningDetail);assert.equal(p.node('progress-bar').value,32);assert.equal(p.node('job-id').value,id);
+  release();await following;const completedDetail=p.node('detail').textContent;
+  await p.invoke('refresh_fm1_library',{});assert.equal(p.node('detail').textContent,completedDetail);assert.equal(p.node('progress-bar').value,96);
+  assert.equal(p.requests.filter(name=>name==='get_fm1_status').length,2);assert.equal(p.requests.filter(name=>name==='list_fm1_apps').length,2);p.dispose();
+});
+
+test('automatic inspection stops on failed and unknown authoritative job outcomes',async()=>{
+  for(const status of ['failed','unknown']){
+    let reads=0;const id='f'.repeat(32);
+    const p=await panel({jobData:({name,defaultJob})=>name==='get_fm1_job'?progressJob(defaultJob.id,++reads===1?'running':status,32):defaultJob});
+    await p.invoke('inspect_fm1_job',{job_id:id});
+    assert.equal(reads,2);assert.equal(p.node('job-id').value,id);assert.equal(JSON.parse(p.node('detail').textContent).status,status);
+    const count=p.requests.length;await tick();assert.equal(p.requests.length,count);assert.ok(!p.requests.includes('confirm_fm1_switch'));p.dispose();
+  }
+});
+
+test('missing sector totals remain indeterminate during work and do not animate after terminal completion',async()=>{
+  const id='e'.repeat(32);let reads=0;let release;
+  const held=new Promise(resolve=>{release=resolve;});
+  const p=await panel({beforeCall:async name=>{if(name==='get_fm1_job'&&reads===1)await held;},jobData:({name,defaultJob})=>{
+    if(name==='get_fm1_job')return progressJob(defaultJob.id,++reads===1?'running':'succeeded',null,null,reads===1?'preparing':'completed');
+    return defaultJob;
+  }});
+  const follow=p.invoke('inspect_fm1_job',{job_id:id});await until(()=>reads===1&&p.node('progress-text').textContent.includes('preparing'));
+  assert.equal(p.node('progress-bar').hidden,false);assert.ok(!('value' in p.node('progress-bar')));assert.ok(!p.node('progress-text').textContent.includes('sectors verified'));
+  release();await follow;assert.equal(p.node('progress-bar').hidden,true);assert.match(p.node('progress-text').textContent,/completed/);p.dispose();
+});
+
+test('a lost relay delivery times out once and explicit Inspect resumes the preserved original job',async()=>{
+  let inspectReads=0;
+  const p=await panel({jobData:({name,defaultJob})=>name==='plan_fm1_app'?null:name==='get_fm1_job'?progressJob(defaultJob.id,++inspectReads===1?'running':'succeeded',inspectReads===1?48:96):defaultJob});
+  await p.invoke('plan_fm1_app',{catalog_id:'nes-test'});
+  const id=p.node('job-id').value;assert.match(p.node('message').textContent,new RegExp('Inspect job '+id));
+  assert.equal(p.requests.filter(name=>name==='plan_fm1_app').length,1);assert.equal(inspectReads,0);
+  p.node('inspect').onclick();await until(()=>inspectReads===2&&p.node('detail').textContent.includes('"status": "succeeded"'));
+  assert.ok(p.requestArgs.filter(item=>item.name==='get_fm1_job').every(item=>item.args.job_id===id));
+  assert.equal(p.requests.filter(name=>name==='plan_fm1_app').length,1);p.dispose();
+});
+
+test('offline job inspection stops with the saved ID and never retries a submission',async()=>{
+  let reads=0;const id='e'.repeat(32);
+  const p=await panel({beforeCall:name=>{if(name==='get_fm1_job'&&++reads===2)throw new Error('Bench connection is offline.');},jobData:({name,defaultJob})=>name==='get_fm1_job'?progressJob(defaultJob.id,'running',16):defaultJob});
+  await assert.rejects(p.invoke('inspect_fm1_job',{job_id:id}),/offline.*Inspect job/s);
+  const count=p.requests.length;await tick();assert.equal(p.requests.length,count);assert.equal(reads,2);
+  assert.equal(p.node('job-id').value,id);assert.ok(!p.requests.includes('plan_fm1_app'));assert.ok(!p.requests.includes('confirm_fm1_switch'));p.dispose();
+});
+
+test('repeated Inspect clicks share one running follow loop for the same original ID',async()=>{
+  let reads=0,release;const held=new Promise(resolve=>{release=resolve;});const id='e'.repeat(32);
+  const p=await panel({beforeCall:async name=>{if(name==='get_fm1_job'&&reads===1)await held;},jobData:({name,defaultJob})=>name==='get_fm1_job'?progressJob(defaultJob.id,++reads===1?'running':'succeeded',reads===1?16:96):defaultJob});
+  p.node('job-id').value=id;p.node('inspect').onclick();await until(()=>reads===1);
+  p.node('inspect').onclick();p.node('inspect').onclick();await tick();
+  assert.equal(p.requests.filter(name=>name==='get_fm1_job').length,2);
+  release();await until(()=>p.node('detail').textContent.includes('"status": "succeeded"'));assert.equal(reads,2);p.dispose();
+});
+
+test('a superseding inspection prevents an older in-flight result from replacing the selected job',async()=>{
+  const oldId='e'.repeat(32),newId='f'.repeat(32);let oldReads=0,release;
+  const held=new Promise(resolve=>{release=resolve;});
+  const p=await panel({beforeCall:async(name,args)=>{if(name==='get_fm1_job'&&args.job_id===oldId&&oldReads===1)await held;},jobData:({name,args,defaultJob})=>{
+    if(name!=='get_fm1_job')return defaultJob;
+    if(args.job_id===oldId){oldReads++;return progressJob(oldId,oldReads===1?'running':'succeeded',oldReads===1?16:96);}
+    return progressJob(newId,'succeeded',96);
+  }});
+  p.node('job-id').value=oldId;p.node('inspect').onclick();await until(()=>p.requests.filter(name=>name==='get_fm1_job').length===2);
+  await p.invoke('inspect_fm1_job',{job_id:newId});release();await tick();
+  assert.equal(p.node('job-id').value,newId);assert.equal(JSON.parse(p.node('detail').textContent).id,newId);assert.equal(p.node('message').textContent,'');
+  const count=p.requests.length;await tick();assert.equal(p.requests.length,count);p.dispose();
+});
+
+test('native teardown cancels automatic follow timers and prevents later job requests',async()=>{
+  const id='e'.repeat(32);
+  const p=await panel({embedded:true,jobData:({name,defaultJob})=>name==='get_fm1_job'?progressJob(defaultJob.id,'running',16):defaultJob});
+  p.node('job-id').value=id;p.node('inspect').onclick();await until(()=>p.node('progress-text').textContent.includes('16/96'));
+  p.events.get('message')({source:p.parent,data:{jsonrpc:'2.0',id:93,method:'ui/resource-teardown',params:{}}});
+  const count=p.requests.length;await tick();assert.equal(p.requests.length,count);assert.equal(p.timers.size,0);
+  assert.equal(p.node('job-id').value,id);p.node('inspect').onclick();await tick();assert.equal(p.requests.length,count);p.dispose();
+});
+
+test('long-running job inspection is bounded and retains its recovery ID',async()=>{
+  const id='e'.repeat(32);
+  const p=await panel({jobData:({name,defaultJob})=>name==='get_fm1_job'?progressJob(defaultJob.id,'running',16):defaultJob});
+  await p.invoke('inspect_fm1_job',{job_id:id});
+  assert.equal(p.requests.filter(name=>name==='get_fm1_job').length,180);assert.ok(p.delays.includes(3000));
+  assert.match(p.node('message').textContent,/Automatic progress paused/);assert.match(p.node('message').textContent,new RegExp(id));
+  const count=p.requests.length;await tick();assert.equal(p.requests.length,count);p.dispose();
+});
+
+test('a mismatched authoritative job ID stops inspection before rendering its progress',async()=>{
+  const id='e'.repeat(32),wrongId='f'.repeat(32);
+  const p=await panel({jobData:({name,defaultJob})=>name==='get_fm1_job'?progressJob(wrongId,'succeeded',96):defaultJob});
+  await assert.rejects(p.invoke('inspect_fm1_job',{job_id:id}),/selected saved job/);
+  assert.equal(p.node('job-id').value,id);assert.ok(!p.node('detail').history.some(value=>value.includes(wrongId)));
+  assert.equal(p.requests.filter(name=>name==='get_fm1_job').length,1);p.dispose();
+});
+
+test('an older delivery snapshot is labeled as saved and does not start a second operation',async()=>{
+  const id='e'.repeat(32);const p=await panel();
+  p.env.DB.sqlite.prepare('INSERT INTO relay_tasks(id,user_id,operation,arguments,state,result,created) VALUES(?,?,?,?,?,?,?)').run(id,'alice','switch_app','{}','succeeded',JSON.stringify({status:'succeeded',data:progressJob(id,'running',16)}),1);
+  await p.invoke('inspect_fm1_request',{request_id:id});
+  assert.match(p.node('message').textContent,/Saved delivery snapshot/);assert.equal(p.node('job-id').value,id);
+  assert.ok(!p.requests.includes('get_fm1_job'));assert.ok(!p.requests.includes('confirm_fm1_switch'));
+  await p.invoke('inspect_fm1_job',{job_id:id});assert.equal(JSON.parse(p.node('detail').textContent).status,'succeeded');p.dispose();
+});
+
+test('official native confirmation stops at vendor handoff and never claims firmware transfer completion',async()=>{
+  let reads=0;
+  const p=await panel({embedded:true,official:true,inventory:detectedInventory(),jobData:({name,defaultJob})=>{
+    if(name==='confirm_fm1_official_update')return {...defaultJob,status:'queued'};
+    if(name==='get_fm1_job'){reads++;return {...defaultJob,operation:'official_updater',handoff:true,firmware_transfer_verified:false};}
+    return defaultJob;
+  }});
+  p.node('official-update').onclick();await until(()=>p.node('approval').open);const id=p.env.DB.sqlite.prepare('SELECT id FROM official_update_approvals').get().id;
+  p.node('confirm').onclick({isTrusted:true});await until(()=>p.node('detail').textContent.includes('firmware_transfer_verified'));
+  assert.equal(reads,1);assert.equal(p.node('progress').hidden,true);assert.equal(p.node('job-id').value,id);
+  assert.equal(JSON.parse(p.node('detail').textContent).firmware_transfer_verified,false);
+  assert.equal(p.requests.filter(name=>name==='confirm_fm1_official_update').length,1);const count=p.requests.length;await tick();assert.equal(p.requests.length,count);p.dispose();
 });

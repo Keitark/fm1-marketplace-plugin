@@ -6,7 +6,34 @@ for this integration. The private [FM1 App Library website](https://fm1-app-libr
 is also available; sign in with the owner account when prompted. Both use the
 [black/mint FM-1 mark](../site/public/fm1-icon.png).
 
-## Current accepted setup (2026-10-10)
+## Progress and the latest NES switch (2026-10-10)
+
+The progress bar appears under **Saved requests & progress** when a job is
+selected. The updated UI follows the original job automatically through sector
+verification, full readback and startup. A full sector bar alone does not mean
+the entire operation has finished. Tracking pauses on connection loss, an
+unknown outcome, or its polling limit; **Inspect job** resumes that exact ID
+without submitting the firmware operation again.
+
+To load updated UI code, close the old FM1 panel and reopen the newest plugin
+card. **Refresh** updates device/catalog data; it does not reload the UI
+resource. Published v5 preserves selected progress. The freshly opened native
+panel still received cached v4 during the October 10 check, so reopening alone
+may not load v5 immediately. Wait for the host's metadata/resource cache to
+refresh, then reopen; a directly connected custom MCP plugin also has a
+[connection-level Refresh flow](https://developers.openai.com/plugins/deploy/connect-chatgpt).
+That flow differs from the panel's device-data button. Older saved request
+entries are delivery snapshots; use **Inspect job** for current device progress.
+
+The later NES switch `9067aa03ef7f4826b9f143722cb5635e` completed successfully:
+**96/96 sectors**, a matching full-image readback, and verified serial startup.
+The [saved switch result](evidence/fm1-nes-switch-20261010.json) records the
+actual operation. The device subsequently reported normal serial mode on
+**COM10**, with the protected session idle and unblocked. Screen, sound and
+physical controls still require bench acceptance; vendor SysEx transfer has
+not been tested.
+
+## Initial v4 setup acceptance (2026-10-10)
 
 The installed native **v4** panel works in Codex. **Refresh** shows **FM1 in
 UBOOT**, six ready app packages, and switching **Enabled**. The official updater
@@ -22,9 +49,9 @@ succeeded without device I/O. Its original request/job ID is
 returned that same job with **96 planned sectors**, `blocked:false`, and
 candidate SHA-256
 `4d4da3ab34b643034ea91ddb670fd3556b737a05835ed77fced687eae6ad345c`.
-Write completion, full readback and boot verification remain false. No actual
-candidate flash has been submitted, and physical startup, screen, sound and
-controls have not been accepted. The
+At that point, write completion, full readback and boot verification were false,
+and no candidate flash had been submitted. The later NES operation is recorded
+above. The
 [saved native plan response](evidence/fm1-v4-native-plan-20261010.json) records
 the installed tool's result.
 

@@ -168,7 +168,7 @@ async function mcp(request,env){
     if(rpc?.method==='tools/call')user(request);
   }
   const handler=createMcpHandler(()=>{
-    const server=new McpServer({name:'FM1 App Library',version:'2.1.0',icons:ICONS},{
+    const server=new McpServer({name:'FM1 App Library',version:'2.1.1',icons:ICONS},{
       jsonSchemaValidator:new CfWorkerJsonSchemaValidator(),
       instructions:'Open the FM1 device panel through this installed plugin. Inspect saved request IDs after a disconnect. Offline planning does not authorize app switching. Switching requires human confirmation and enabled bench capability.',
     });
@@ -191,7 +191,7 @@ async function mcp(request,env){
     }
     // Older installed descriptors can still fetch the current panel at their
     // original URI. New descriptors exclusively advertise RESOURCE_URI.
-    for(const uri of [RESOURCE_URI,'ui://fm1/app-library-v1.html','ui://fm1/device-panel-v2.html','ui://fm1/device-panel-v3.html']){
+    for(const uri of [RESOURCE_URI,'ui://fm1/app-library-v1.html','ui://fm1/device-panel-v2.html','ui://fm1/device-panel-v3.html','ui://fm1/device-panel-v4.html']){
       registerAppResource(server,'FM1 device panel',uri,{},async()=>({contents:[{
         uri,mimeType:'text/html;profile=mcp-app',text:UI_HTML,
         _meta:{ui:{prefersBorder:true,csp:{connectDomains:[],resourceDomains:[]}},'openai/ui':{availableDisplayModes:['inline','fullscreen'],preferredDisplayMode:'fullscreen'}},

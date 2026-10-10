@@ -5,14 +5,30 @@ polls the private hosted Site using outbound HTTPS and forwards a small set of
 operations to the existing authenticated bridge. It imports no USB/serial
 backend and does not start, restart, configure, or replace the bridge or its
 protected writer session. The installed plugin, native panel, website, and live
-relay have passed metadata round trips. Site version 4 is privately deployed
-and MCP-ready; the actual Codex panel renders the updated black/mint UI with
-**FM1 in UBOOT**. The v1/v2/v3 resource aliases return the current v4 UI for older
-installed descriptors.
-The verified protected session and current baseline are now prepared as dated
-below. Device writes and physical acceptance remain separate bench work.
+relay have passed metadata round trips. Site version 5 is privately deployed
+and MCP-ready, displaying server version 2.1.1 with source
+`7c2a46dd4719db0b415a2645db65e5f7b1288a3d`. The current resource is
+`ui://fm1/device-panel-v5.html`; v1-v4 aliases serve the same UI for older
+installed descriptors. Server SDK 2.3.1 and ext-apps 2.0.3 remain pinned.
+Close and reopen an existing panel first. The latest new native panel still
+loaded the older cached UI, whose **Refresh** cleared the progress bar
+asynchronously. If that UI persists, the plugin connection or resource cache
+needs refreshing; native v5 acceptance remains pending an actual cache reload.
+The published and tested v5 UI uses bounded, cancellable read-only inspection
+of the exact original job. Its **Refresh** updates metadata while preserving
+selected progress.
 
-## Current live acceptance (2026-10-10)
+The user-confirmed NES switch job `9067aa03ef7f4826b9f143722cb5635e` completed
+on 2026-10-10 at 10:38 JST with 96/96 sectors, full readback and serial startup
+verified. Subsequent inventory reported COM10 in normal serial mode and the
+protected session idle/unblocked. The
+[saved switch response](evidence/fm1-nes-switch-20261010.json) retains that
+original job. Physical acceptance remains false, and official MIDI/SysEx
+transfer is untested. The protected setup and initial v4 acceptance below are
+dated evidence. The v5 release passed 84 Site tests (40 server, 40 UI, 4 SDK),
+typechecking and production build. See [VERIFICATION.md](VERIFICATION.md).
+
+## Initial v4 live acceptance (2026-10-10)
 
 Owner-private Site v4 deployment `appgdep_6ac9903cd9e08191b5df920575373d1e`
 has MCP enabled and source SHA `bd87d14a039b8ef5233a6b3c60291c3642ee7f98`.
