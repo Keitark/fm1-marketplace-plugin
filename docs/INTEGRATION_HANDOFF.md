@@ -1,6 +1,63 @@
 # FM1 Codex integration handoff
 
-## Current implementation
+## FM1 Forge final release 3.0.1 (2026-10-11)
+
+The same owner-private plugin remains
+`plugins_6ac9ad3fc1c8819195580a4747c50052`, displayed as **FM1 Forge**.
+Final release `pluginrel_6acb15fe4ce88191bb211830c3425552` is version **3.0.1**.
+The Site URL and MCP endpoint remain
+`https://fm1-app-library.keitark.chatgpt.site/` and its `/mcp` endpoint.
+Final Site source `3e97b09eaa41515deda1401cd46d42397ee479ed` deployed as
+`appgdep_6acb15fa58908191bf74baadb8ab0b70`; deployment succeeded with MCP enabled.
+
+The current resource is `ui://fm1/forge-panel-v2.html`, retaining earlier
+aliases. It supplies the black/plain default, diagnostic onboarding,
+USB/system → HAL → user module designer, strict versioned project configuration
+and supported host message/copy fallback. Project creation uses durable
+per-owner diagnostic write/full-readback/startup proof; it remains available
+after recent-request history rotates. No browser preference or delivery
+snapshot can invent that proof, and uncertain jobs retain their original IDs.
+
+The final correction rejects `sdk-320` with either RGB444 LCD preset. The real
+SDK setter is `system_clock_set`; its 320 MHz table gives a 53 MHz LSB, while
+the 15/30 MHz RGB444 paths require 60 MHz. Stock DMA remains selectable with
+`sdk-320`; all LCD presets remain selectable with `sdk-default`.
+
+Full final Site tests, typechecking and production build passed. Integration
+verification passed 181 tests. The primary immutable-runtime suite ran 51
+tests with five skipped; its backend suite passed 35 tests. These checks do
+not qualify the firmware candidate or physical hardware.
+
+The newest native card has not yet been expanded; older expanded instances
+remain cached App Library UI. Native rendering and panel-to-conversation
+acceptance remain separate from publication. Runtime elevation was canceled:
+no new protected helper was started, no diagnostic installation occurred and
+no firmware write was performed. The ready protected-helper prerequisite and
+explicit transfer confirmation remain pending. See [VERIFICATION.md](VERIFICATION.md)
+and the current [Forge guide](FORGE_GUIDE.md).
+
+## Initial FM1 Forge 3.0.0 release (2026-10-11, historical)
+
+The existing private plugin was updated in place to **3.0.0**, displayed as FM1
+Forge. ID `plugins_6ac9ad3fc1c8819195580a4747c50052`, endpoint and privacy remain
+unchanged. Release `pluginrel_6acb135969b08191aafc2078dcbbc09f` was read back;
+the Codex plugin cache has version 3.0.0. The owner-private Site deployment
+`appgdep_6acb132eb06c8191b4dfc59c0b83ac18` succeeded with MCP enabled from pushed
+source `090cb049f4ad9c76d9484da7a162ef48d161f8d9`.
+
+Resource `ui://fm1/forge-panel-v1.html` adds opaque black/plain appearance,
+diagnostics onboarding, a graphical fixed USB/system → HAL → user module
+configuration and supported native message action/copy fallback. Previous
+resource aliases remain available. D1 records only exact terminal diagnostic
+write/full-readback/startup proof as a durable per-owner project gate.
+
+The live installed tool returns six profiles and `forge.diagnostic_baseline:null`;
+no diagnostic installation has been performed. Existing expanded App Library
+instances remain cached older UI, so native Forge rendering still needs the
+newest card expanded. This is distinct from the saved release and live service.
+The guide is [FORGE_GUIDE.md](FORGE_GUIDE.md).
+
+## Historical v6 implementation
 
 Site v6 is now published owner-private with MCP enabled. The installed Codex
 panel has loaded its **Appearance** controls and accepted Mint Light/Circuit

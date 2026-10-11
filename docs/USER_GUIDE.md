@@ -1,4 +1,29 @@
-# FM1 App Library user guide
+# FM1 Forge user guide
+
+For the current **3.0.1** diagnostic-to-project workflow, black default panel,
+graphical module configuration and all transfer methods, read
+[FORGE_GUIDE.md](FORGE_GUIDE.md). The final private service and plugin release
+are updated. The current resource is `ui://fm1/forge-panel-v2.html`; the newest
+native card has not yet been expanded. Older expanded panels retain cached App
+Library UI, so expand the newest Forge card and check its header/module designer.
+
+The default is plain, opaque black with **Reset to Forge Black**; thirteen
+palettes and five patterns remain available as local preferences. The module
+designer preserves CDC/UBOOT recovery and lets you select UAC, the LCD preset
+and diagnostics or your own user module. `sdk-320` requires stock DMA; the
+RGB444 presets require SDK-default CPU because they need a 60 MHz LSB, while
+the 320 MHz SDK table supplies 53 MHz.
+
+Diagnostics transfer has not been performed. Runtime elevation was canceled,
+so no new protected helper was started and no firmware was written. Install
+and verify the diagnostics baseline before **New firmware project** unlocks;
+then test the physical inputs, LCD and sound. **Ask Codex** requests a build
+through a supported host message or provides a copyable prompt. It does not
+flash the firmware or claim build/hardware acceptance.
+
+The material below records earlier App Library behavior and dated bench checks.
+
+## Earlier App Library guide
 
 Use the installed **FM1 App Library** plugin in ChatGPT or Codex and ask it to
 open your FM1 app library. Its native panel is the primary interface selected

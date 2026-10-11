@@ -1,4 +1,33 @@
-# FM1 Marketplace Plugin
+# FM1 Forge
+
+The private FM1 App Library plugin is now **FM1 Forge 3.0.1**: install an asset-free
+diagnostic baseline, test hardware, configure USB/HAL/user modules graphically,
+then ask Codex to create and build a firmware project. It preserves the existing
+plugin ID, hosted MCP endpoint, local protected writer and saved-job history.
+The panel defaults to a plain, opaque black background.
+
+Read the current [Forge guide](docs/FORGE_GUIDE.md). The owner-private Site's
+final Forge release is deployed with MCP enabled at the existing endpoint. Its
+resource is `ui://fm1/forge-panel-v2.html`. The same private
+[FM1 Forge plugin](https://chatgpt.com/plugins/plugins_6ac9ad3fc1c8819195580a4747c50052)
+was updated in place.
+
+The full final Site tests, typecheck and production build passed, along with
+181 integration tests. Diagnostics installation and physical acceptance remain
+pending. Runtime elevation was canceled: no new protected helper was started
+and no firmware write occurred. Expand the newest Forge card to inspect the
+native interface; that card has not yet been expanded and older expanded panels
+still show cached App Library UI. A package release does not establish native
+rendering or device qualification.
+
+The experimental `sdk-320` clock supports stock DMA only. Its SDK table supplies
+a 53 MHz LSB, incompatible with the 15/30 MHz RGB444 LCD presets' required 60 MHz LSB;
+choose the SDK-default CPU clock for those LCD presets.
+
+The records below describe earlier App Library releases. Use the Forge guide
+and dated verification entries for the current workflow.
+
+## Earlier App Library implementation
 
 FM1 app library integration for ChatGPT and Codex through a private Site,
 MCP App panel, plugin extension entrypoints, and top-level WebMCP tools.
@@ -101,7 +130,7 @@ python -m unittest discover -s tools/jieli-wl82 -p 'test_*.py'
 node --test tools/jieli-wl82/test_remote_store.cjs
 ```
 
-The current checks passed **189 Python tests**, **62 focused relay tests**,
+The historical v6 checks passed **189 Python tests**, **62 focused relay tests**,
 **10 browser-store JavaScript tests**, and **100 Site tests**: 40 server, 52 UI,
 4 SDK, and 4 appearance-engine tests. See
 [VERIFICATION.md](docs/VERIFICATION.md) for the dated

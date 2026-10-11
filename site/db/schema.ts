@@ -29,3 +29,8 @@ export const approvals = sqliteTable("switch_approvals", {
   id: text("id").primaryKey(), userId: text("user_id").notNull(), catalogId: text("catalog_id").notNull(),
   digest: text("digest").notNull(), entryMethod: text("entry_method").notNull(), expires: integer("expires").notNull(), used: integer("used").notNull().default(0),
 });
+
+export const forgeBaselines = sqliteTable("forge_baselines", {
+  userId: text("user_id").primaryKey(), jobId: text("job_id").notNull(),
+  sha256: text("sha256").notNull(), verifiedAt: integer("verified_at").notNull(),
+});

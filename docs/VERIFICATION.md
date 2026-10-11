@@ -1,5 +1,61 @@
 # Integration verification
 
+## FM1 Forge final release 3.0.1, 2026-10-11
+
+Final Site source `3e97b09eaa41515deda1401cd46d42397ee479ed` deployed privately
+as `appgdep_6acb15fa58908191bf74baadb8ab0b70`; deployment succeeded with MCP
+enabled. Resource `ui://fm1/forge-panel-v2.html` retains the earlier aliases.
+The same private plugin ID `plugins_6ac9ad3fc1c8819195580a4747c50052` was updated
+to release `pluginrel_6acb15fe4ce88191bb211830c3425552`, version **3.0.1**.
+The Site URL, `/mcp` endpoint and owner-private access remain unchanged.
+
+| Final check | Result |
+|---|---|
+| Full final Site test suites | Passed |
+| Site typechecking | Passed |
+| Site production build | Passed |
+| Integration test suite | 181 tests passed |
+| Primary immutable-runtime suite | 51 tests run; five skipped |
+| Primary backend suite | 35 tests passed |
+| Private Site publication | Succeeded; MCP enabled |
+| Private plugin update | Same ID; release 3.0.1 |
+| Newest native Forge card | Not yet expanded; older expanded panels remain cached App Library UI |
+| New protected helper | Not started; runtime elevation canceled |
+| Diagnostics transfer / candidate qualification | Not accepted; no firmware write occurred |
+| Physical LCD, inputs, audio, USB and stability | Pending device tests |
+
+The native panel defaults to opaque black/plain, retains optional appearances,
+and separates fixed USB/system recovery, shared HAL and user modules. The
+project configuration rejects unknown fields, unsafe folders and incompatible
+presets. User text remains in text controls and host text messages. Tests cover
+native messaging support/rejection, standalone copy fallback and retention of
+the exact original job and uncertain transfer outcome while editing a project.
+A DB-backed regression rotated 32 newer requests and retained the original
+per-owner diagnostics proof, independent of the twelve visible recent requests.
+
+Compiler evidence established the real setter as `system_clock_set`; `clk_set`
+is a stub. The 320 MHz SDK table supplies a 53 MHz LSB, while the 15/30 MHz
+RGB444 LCD presets require 60 MHz. The panel, Python validator and schema now
+reject that combination. `sdk-320` with stock DMA and `sdk-default` with each
+LCD preset remain selectable. Higher FPS and clock stability are not accepted
+from compilation or offline tests.
+
+The newest native card still needs expansion and inspection. Prior screenshots
+and older expanded App Library panels do not establish final Forge rendering.
+Runtime elevation was canceled, leaving no new protected helper and no writes.
+Existing snapshots, receipts and saved job IDs are preserved. The diagnostics
+baseline and physical tests remain separate prerequisites; no firmware
+candidate or hardware qualification is claimed.
+
+The local bridge and outbound relay were then restarted through their supported
+launchers, with 53 completed/reported relay journals retained. Current bridge
+PID is 154724 and relay PID is 209572. Both relay write permissions remain off;
+catalog inventory recognizes all six profiles. These are metadata connections,
+with no device operation requested. The old session's `stopped:false` field
+reflects the absence of its stop marker; its recorded helper PID 240396 is dead.
+The old verified baseline is usable for offline packaging, but that status field
+alone does not establish an available protected helper.
+
 ## FM1 appearance update, 2026-10-10
 
 Site v6 adds twelve prepared palettes and five independently selectable
