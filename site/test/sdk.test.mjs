@@ -21,7 +21,7 @@ for(const [era,revision] of [['modern','2026-07-28'],['legacy','2025-11-25']]){
       const tools=await client.listTools();
       assert.equal(tools.tools.length,10);
       const panel=tools.tools.find(tool=>tool.name==='open_fm1_library');
-      assert.equal(RESOURCE_URI,'ui://fm1/device-panel-v6.html');
+      assert.equal(RESOURCE_URI,'ui://fm1/forge-panel-v2.html');
       assert.equal(panel._meta.ui.resourceUri,RESOURCE_URI);
       assert.ok(tools.tools.filter(tool=>tool._meta?.ui?.resourceUri).every(tool=>tool._meta.ui.resourceUri===RESOURCE_URI));
       assert.deepEqual(panel._meta['openai/ui'].entrypoints,[{type:'global'},{type:'thread'}]);
@@ -30,12 +30,12 @@ for(const [era,revision] of [['modern','2026-07-28'],['legacy','2025-11-25']]){
       const resource=await client.readResource({uri:RESOURCE_URI});
       assert.equal(resource.contents[0].mimeType,'text/html;profile=mcp-app');
       assert.match(resource.contents[0].text,/FM1PluginHost/);
-      for(const uri of ['ui://fm1/app-library-v1.html','ui://fm1/device-panel-v2.html','ui://fm1/device-panel-v3.html','ui://fm1/device-panel-v4.html','ui://fm1/device-panel-v5.html']){
+      for(const uri of ['ui://fm1/forge-panel-v1.html','ui://fm1/app-library-v1.html','ui://fm1/device-panel-v2.html','ui://fm1/device-panel-v3.html','ui://fm1/device-panel-v4.html','ui://fm1/device-panel-v5.html','ui://fm1/device-panel-v6.html']){
         const previous=await client.readResource({uri});
         assert.deepEqual(previous.contents,[{...resource.contents[0],uri}]);
       }
       const library=await client.callTool({name:'open_fm1_library',arguments:{}});
-      assert.equal(library.structuredContent.profiles.length,5);
+      assert.equal(library.structuredContent.profiles.length,6);
       assert.equal(library.structuredContent.relay.connected,false);
       assert.equal(env.DB.sqlite.prepare('SELECT count(*) AS n FROM relay_tasks').get().n,0);
       const invalid=await client.callTool({name:'plan_fm1_app',arguments:{catalog_id:'../bad'}});
@@ -74,7 +74,7 @@ test('modern discovery has typed result, identity and private cache semantics',a
   const {status,value}=await modern('server/discover',{_meta:meta()});
   assert.equal(status,200);assert.equal(value.result.resultType,'complete');
   assert.ok(value.result.supportedVersions.includes('2026-07-28'));
-  assert.equal(value.result._meta['io.modelcontextprotocol/serverInfo'].version,'2.2.0');
+  assert.equal(value.result._meta['io.modelcontextprotocol/serverInfo'].version,'3.0.1');
   assert.equal(value.result.ttlMs,0);assert.equal(value.result.cacheScope,'private');
 });
 test('modern missing envelope, unsupported revision and mismatched routing header reject before work',async()=>{

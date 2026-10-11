@@ -1,6 +1,7 @@
 import { ID, PublicError, PROFILES, RESOURCE_URI, TOOLS, sanitize, validate } from './fm1-contract.mjs';
 import { UI_HTML } from './fm1-ui.mjs';
 import { ICONS } from './fm1-icon.mjs';
+import { diagnosticProof } from './fm1-forge-baseline.mjs';
 import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
 import { CfWorkerJsonSchemaValidator } from '@modelcontextprotocol/server/validators/cf-worker';
 import { registerAppResource, registerAppTool } from '@modelcontextprotocol/ext-apps/server';
@@ -27,8 +28,21 @@ async function relayState(env) {
 }
 async function latest(env,owner,operation){const row=await db(env).prepare("SELECT result FROM relay_tasks WHERE user_id=? AND operation=? AND state='succeeded' ORDER BY created DESC,rowid DESC LIMIT 1").bind(owner,operation).first();return row?.result?JSON.parse(row.result).data:null;}
 async function library(env,owner){
+  const baseline=await db(env).prepare('SELECT job_id,sha256,verified_at FROM forge_baselines WHERE user_id=?').bind(owner).first();
   return {profiles:PROFILES,relay:await relayState(env),catalog:await latest(env,owner,'catalog'),inventory:await latest(env,owner,'status'),
+    forge:{diagnostic_baseline:baseline?{...baseline,catalog_id:'factory-diag',write_verified:true,full_readback_verified:true,boot_verified:true}:null},
     recent_requests:(await db(env).prepare('SELECT * FROM relay_tasks WHERE user_id=? ORDER BY created DESC,rowid DESC LIMIT 12').bind(owner).all()).results.map(parse)};
+}
+async function rememberDiagnostics(env,task,clean){
+  if(clean.status!=='succeeded'||!['switch_app','job'].includes(task.operation))return;
+  const catalog=await latest(env,task.user_id,'catalog');
+  const variant=catalog?.apps?.find(app=>app.profile==='diagnostics')?.variants?.find(item=>item.id==='factory-diag');
+  const proof=diagnosticProof(task,clean.data,variant?.sha256);
+  if(!proof)return;
+  // Scope to the authenticated owner and keep a proof after recent-request
+  // history rotates. Duplicate acknowledgments repair an interrupted save.
+  await db(env).prepare('INSERT INTO forge_baselines(user_id,job_id,sha256,verified_at) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET job_id=excluded.job_id,sha256=excluded.sha256,verified_at=excluded.verified_at WHERE excluded.verified_at>=forge_baselines.verified_at')
+    .bind(task.user_id,proof.job_id,proof.sha256,proof.verified_at).run();
 }
 async function enqueue(env,owner,operation,args,taskId=ident()){
   const connection=await relayState(env);
@@ -151,9 +165,10 @@ async function relayRequest(request,env,path){
     const clean={status:value.status,...(value.data!==undefined?{data:sanitize(value.data)}:{}),...(value.error?{error:sanitize(String(value.error))}:{})};
     const encoded=JSON.stringify(clean);
     if(encoded.length>60000)throw new PublicError('Result is too large.',413);
-    if(task.result){if(task.result!==encoded)throw new PublicError('A different result is already saved.',409);return json({saved:true});}
+    if(task.result){if(task.result!==encoded)throw new PublicError('A different result is already saved.',409);await rememberDiagnostics(env,task,clean);return json({saved:true});}
     const saved=await db(env).prepare('UPDATE relay_tasks SET state=?,result=? WHERE id=? AND result IS NULL').bind(value.status,encoded,value.id).run();
     if(!saved.meta?.changes){const current=await db(env).prepare('SELECT result FROM relay_tasks WHERE id=?').bind(value.id).first();if(current?.result!==encoded)throw new PublicError('A different result is already saved.',409);}
+    await rememberDiagnostics(env,task,clean);
     return json({saved:true});
   }
   throw new PublicError('Unknown relay route.',404);
@@ -168,9 +183,9 @@ async function mcp(request,env){
     if(rpc?.method==='tools/call')user(request);
   }
   const handler=createMcpHandler(()=>{
-    const server=new McpServer({name:'FM1 App Library',version:'2.2.0',icons:ICONS},{
+    const server=new McpServer({name:'FM1 Forge',version:'3.0.1',icons:ICONS},{
       jsonSchemaValidator:new CfWorkerJsonSchemaValidator(),
-      instructions:'Open the FM1 device panel through this installed plugin. Inspect saved request IDs after a disconnect. Offline planning does not authorize app switching. Switching requires human confirmation and enabled bench capability.',
+      instructions:'Open FM1 Forge through this installed plugin. Install and verify diagnostics, inspect hardware, then configure USB/system, HAL and user modules and ask Codex to build. Inspect saved request IDs after a disconnect. Offline planning does not authorize app switching. Switching requires human confirmation and enabled bench capability. Higher clock/LCD presets require a device test.',
     });
     for(const tool of TOOLS){
       const shape=Object.fromEntries(Object.entries(tool.inputSchema.properties).map(([key,schema])=>[
@@ -191,8 +206,8 @@ async function mcp(request,env){
     }
     // Older installed descriptors can still fetch the current panel at their
     // original URI. New descriptors exclusively advertise RESOURCE_URI.
-    for(const uri of [RESOURCE_URI,'ui://fm1/app-library-v1.html','ui://fm1/device-panel-v2.html','ui://fm1/device-panel-v3.html','ui://fm1/device-panel-v4.html','ui://fm1/device-panel-v5.html']){
-      registerAppResource(server,'FM1 device panel',uri,{},async()=>({contents:[{
+    for(const uri of [RESOURCE_URI,'ui://fm1/forge-panel-v1.html','ui://fm1/app-library-v1.html','ui://fm1/device-panel-v2.html','ui://fm1/device-panel-v3.html','ui://fm1/device-panel-v4.html','ui://fm1/device-panel-v5.html','ui://fm1/device-panel-v6.html']){
+      registerAppResource(server,'FM1 Forge',uri,{},async()=>({contents:[{
         uri,mimeType:'text/html;profile=mcp-app',text:UI_HTML,
         _meta:{ui:{prefersBorder:true,csp:{connectDomains:[],resourceDomains:[]}},'openai/ui':{availableDisplayModes:['inline','fullscreen'],preferredDisplayMode:'fullscreen'}},
       }]}));

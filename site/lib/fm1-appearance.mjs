@@ -1,6 +1,7 @@
 /** A self-contained palette engine, shared by the server and inline panel. */
 function createAppearanceEngine() {
   const PRESETS = Object.freeze([
+    { id:'forge-black', name:'Forge Black', scheme:'dark', background:'#000000', accent:'#a3efcc' },
     { id:'fm1-mint', name:'FM1 Mint', scheme:'dark', background:'#101a18', accent:'#a3efcc' },
     { id:'mint-light', name:'Mint Light', scheme:'light', background:'#edf8f1', accent:'#16744f' },
     { id:'midnight-blue', name:'Midnight Blue', scheme:'dark', background:'#0c1729', accent:'#86baff' },
@@ -89,6 +90,8 @@ export const appearanceRuntime='window.FM1Appearance=('+createAppearanceEngine.t
 
 /** Colour overrides follow the existing layout CSS; UI controls remain root-owned. */
 export const appearanceCss=String.raw`
+html{background:#000000;min-height:100%;color-scheme:dark}
+html,body{min-height:100vh;min-height:100dvh}
 body[data-appearance]{background-color:var(--paper);color:var(--ink);background-image:none}
 body[data-appearance][data-scheme="dark"]{color-scheme:dark}
 body[data-appearance][data-scheme="light"]{color-scheme:light}
@@ -108,6 +111,7 @@ body[data-appearance] .state,body[data-appearance] .jobline{border-color:var(--l
 body[data-appearance] .jobline button{color:var(--ink)}
 body[data-appearance] .icon,body[data-appearance] .icon.doom,body[data-appearance] .icon.mdx,body[data-appearance] .icon.buddha,body[data-appearance] .icon.protracker{background:var(--surface-alt);color:var(--accent-ink)}
 body[data-appearance] input,body[data-appearance] select{background:var(--input);border-color:var(--line);color:var(--ink)}
+body[data-appearance] textarea{background:var(--input);border:1px solid var(--line);color:var(--ink);font:inherit;width:100%;padding:9px 10px;border-radius:6px;resize:vertical}
 body[data-appearance] input::placeholder{color:var(--muted);opacity:1}
 body[data-appearance] .primary{background:var(--accent);border-color:var(--focus);color:var(--button-ink)}
 body[data-appearance] .secondary{background:transparent;border-color:var(--line);color:var(--ink)}

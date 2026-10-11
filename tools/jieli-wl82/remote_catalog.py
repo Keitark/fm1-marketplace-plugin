@@ -8,9 +8,9 @@ import re
 SIZE = 0x100000
 APP_START = 0x4120
 APP_END = APP_START + 584956
-PROFILES = ('nes', 'doom', 'mdx', 'buddha', 'protracker')
-TITLES = dict(nes='NES', doom='Doom', mdx='MDX Karaoke', buddha='Buddha Machine', protracker='ProTracker')
-DESCRIPTIONS = dict(nes='Play a packaged NES ROM.', doom='Explore a packaged Doom build.',
+PROFILES = ('diagnostics', 'nes', 'doom', 'mdx', 'buddha', 'protracker')
+TITLES = dict(diagnostics='Forge diagnostics', nes='NES', doom='Doom', mdx='MDX Karaoke', buddha='Buddha Machine', protracker='ProTracker')
+DESCRIPTIONS = dict(diagnostics='Asset-free input, LCD and audio diagnostic baseline.', nes='Play a packaged NES ROM.', doom='Explore a packaged Doom build.',
                     mdx='Play a packaged MDX music bank.', buddha='Loop and play a packaged chant.',
                     protracker='Edit and play four-channel MOD songs.')
 

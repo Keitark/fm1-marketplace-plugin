@@ -1,0 +1,32 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "author": {
+    "name": "Keitarou Kondou"
+  },
+  "description": "FM1 diagnostic firmware, module configuration and custom firmware projects through the hosted Forge plugin panel.",
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "brandColor": "#000000",
+        "brandColorDark": "#a3efcc",
+        "capabilities": [
+          "Interactive"
+        ],
+        "category": "Productivity",
+        "composerIcon": "./assets/fm1.svg",
+        "composerIconDark": "./assets/fm1.svg",
+        "defaultPrompt": "Open my FM1 App Library and check the connection and available apps.",
+        "developerName": "Keitarou Kondou",
+        "displayName": "FM1 Forge",
+        "logo": "./assets/fm1.svg",
+        "logoDark": "./assets/fm1.svg",
+        "longDescription": "Install the diagnostic baseline, test controls, LCD and audio, configure USB/system and user modules graphically, and ask Codex to build a custom firmware project. The native panel has a plain black default, optional colours and saved transfer progress. Serial-to-UBOOT and direct UBOOT use validated private application packages; official .fwsc/SysEx updates use the vendor updater.",
+        "shortDescription": "Build and test FM1 firmware"
+      }
+    }
+  },
+  "homepage": "https://fm1-app-library.keitark.chatgpt.site/",
+  "name": "fm1-app-library",
+  "repository": "https://github.com/Keitark/fm1-marketplace-plugin",
+  "version": "3.0.1"
+}
